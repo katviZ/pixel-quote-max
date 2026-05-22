@@ -1,0 +1,116 @@
+/* Headless QC for the Pixel Quote Max engine.  Run: node test.mjs */
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+const PQM = require("./engine.js");
+
+let pass = 0, fail = 0;
+const ok = (name, cond, extra = "") => {
+  if (cond) { pass++; console.log("  ✓ " + name); }
+  else { fail++; console.log("  ✗ " + name + (extra ? "  → " + extra : "")); }
+};
+const approx = (a, b, eps = 0.5) => Math.abs(a - b) <= eps;
+const noNaN = (obj, path = "root") => {
+  for (const k in obj) {
+    const v = obj[k];
+    if (typeof v === "number" && !isFinite(v)) { console.log("  ✗ NaN/Inf at " + path + "." + k); fail++; }
+    else if (v && typeof v === "object") noNaN(v, path + "." + k);
+  }
+};
+
+const xml = readFileSync(new URL("./pixel-data.xml", import.meta.url), "utf8");
+const db = PQM.parseDbXml(xml);
+
+console.log("\n── 1 · XML database parsing ──");
+ok("3 products parsed", db.products.length === 3, "got " + db.products.length);
+ok("meta.curveSurchargePct = 15", db.meta.curveSurchargePct === 15);
+ok("meta.pixelsPerPortMini = 650000", db.meta.pixelsPerPortMini === 650000);
+ok("install tiers = 3", db.install.length === 3);
+ok("mini controller tiers = 6", db.controllers.mini.length === 6);
+ok("micro controller tiers = 5", db.controllers.micro.length === 5);
+const outdoor = PQM.getProduct(db, "outdoor");
+ok("outdoor has 4 pitches", outdoor.pitches.length === 4);
+ok("outdoor has 3 cabinets", outdoor.cabinets.length === 3);
+ok("outdoor cabinet0 = 960x960", outdoor.cabinets[0].w === 960 && outdoor.cabinets[0].h === 960);
+ok("outdoor module = 320x160", outdoor.moduleW === 320 && outdoor.moduleH === 160);
+ok("microled detected as micro", PQM.isMicro(PQM.getProduct(db, "microled")));
+
+console.log("\n── 2 · Price lookups ──");
+ok("P4 outdoor rate = 5500", PQM.priceForPitch(outdoor, 4).rate === 5500);
+ok("P2.5 outdoor gst = 18", PQM.priceForPitch(outdoor, 2.5).gst === 18);
+const interp = PQM.priceForPitch(outdoor, 3.5);
+ok("interp P3.5 = 6375 (between 7250 & 5500)", interp.rate === 6375, "got " + interp.rate);
+ok("mini ctrl 2 ports = 25000", PQM.controllerPrice(db, 2, false) === 25000);
+ok("micro ctrl 4 ports = 150000", PQM.controllerPrice(db, 4, true) === 150000);
+ok("install <50sqft = 300", PQM.installRate(db, 40) === 300);
+ok("install 100sqft = 200", PQM.installRate(db, 100) === 200);
+ok("install 500sqft = 150", PQM.installRate(db, 500) === 150);
+
+console.log("\n── 3 · FLAT quote (outdoor P4, 12×8 ft, 960² cab) ──");
+const flat = PQM.computeQuote(
+  { mode: "flat", productId: "outdoor", pitch: 4, widthFt: 12, heightFt: 8, cabIndex: 0 }, db);
+noNaN(flat, "flat");
+ok("cabCountW = 4", flat.cabCountW === 4, "got " + flat.cabCountW);
+ok("cabCountH = 3", flat.cabCountH === 3, "got " + flat.cabCountH);
+ok("totalCabs = 12", flat.totalCabs === 12);
+ok("builtW = 3840mm", flat.builtWmm === 3840);
+ok("modPerCab = 18 (3×6)", flat.modPerCab === 18, "got " + flat.modPerCab);
+ok("pxW = 960", flat.pxW === 960, "got " + flat.pxW);
+ok("area ≈ 119.0 sqft", approx(flat.areaSqft, 119.04, 0.1), "got " + flat.areaSqft.toFixed(2));
+ok("ports = 2", flat.ports === 2, "got " + flat.ports);
+ok("3 price lines (no curve)", flat.lines.length === 3);
+ok("no curve block", flat.curve === null);
+ok("subtotal = Σ line amounts", flat.subtotal === flat.lines.reduce((s, l) => s + l.amount, 0));
+ok("totalGst = Σ line gst", flat.totalGst === flat.lines.reduce((s, l) => s + l.gst, 0));
+ok("grandTotal = subtotal + gst", flat.grandTotal === flat.subtotal + flat.totalGst);
+ok("LED cost = rate×area", flat.lines[0].amount === Math.round(5500 * flat.areaSqft));
+console.log("     → built " + flat.builtWft.toFixed(1) + "×" + flat.builtHft.toFixed(1) + "ft, " +
+  flat.totalPixels.toLocaleString() + "px, grand total " + PQM.fmtINR(flat.grandTotal));
+
+console.log("\n── 4 · CURVED quote (outdoor P4, 16×8 ft, signature, outer) ──");
+const curved = PQM.computeQuote(
+  { mode: "curved", productId: "outdoor", pitch: 4, widthFt: 16, heightFt: 8, cabIndex: 0,
+    curveMode: "preset", preset: "signature", curveType: "outer", cabWeightKg: 14 }, db);
+noNaN(curved, "curved");
+ok("curve block present", !!curved.curve);
+ok("4 price lines (incl. curve)", curved.lines.length === 4);
+ok("curve surcharge line present", curved.lines[3].item === "Curve Fabrication");
+ok("surcharge = 15% of LED cost", curved.curve.surcharge === Math.round(curved.lines[0].amount * 0.15),
+  "got " + curved.curve.surcharge);
+ok("R > 0", curved.curve.R > 0);
+ok("sag > 0", curved.curve.sag > 0);
+ok("arc length ≥ chord", curved.curve.arcLen >= curved.curve.chordMm - 0.01,
+  "arc " + curved.curve.arcLen.toFixed(0) + " vs chord " + curved.curve.chordMm.toFixed(0));
+ok("R = 2.5 × width (signature)", approx(curved.curve.R, curved.curve.chordMm * 2.5, 1));
+ok("verdict is a known label", ["EXCELLENT", "VERY GOOD", "ACCEPTABLE", "FACETED", "SEVERE"].includes(curved.curve.verdict));
+ok("recommended supply > 0 kW", curved.curve.recommendedSupply > 0);
+ok("steel weight > 0", curved.curve.steelWeightKg > 0);
+ok("grandTotal = subtotal + gst", curved.grandTotal === curved.subtotal + curved.totalGst);
+console.log("     → R " + (curved.curve.R / 1000).toFixed(2) + "m, sag " + curved.curve.sag.toFixed(0) +
+  "mm, verdict " + curved.curve.verdict + ", grand total " + PQM.fmtINR(curved.grandTotal));
+
+console.log("\n── 5 · Curve modes (radius & sagitta) ──");
+const byRadius = PQM.computeQuote(
+  { mode: "curved", productId: "indoor", pitch: 2.5, widthFt: 16, heightFt: 9, cabIndex: 0,
+    curveMode: "radius", radiusMm: 8000, curveType: "inner" }, db);
+ok("radius mode honours R", approx(byRadius.curve.R, 8000, 0.01), "got " + byRadius.curve.R);
+const bySag = PQM.computeQuote(
+  { mode: "curved", productId: "indoor", pitch: 2.5, widthFt: 16, heightFt: 9, cabIndex: 0,
+    curveMode: "sagitta", sagittaMm: 457, curveType: "outer" }, db);
+// verify sagitta round-trips: sag computed back from derived R should match input
+ok("sagitta mode round-trips (≈457mm)", approx(bySag.curve.sag, 457, 2), "got " + bySag.curve.sag.toFixed(1));
+
+console.log("\n── 6 · Edge cases ──");
+const tiny = PQM.computeQuote({ mode: "flat", productId: "microled", pitch: 1.25, widthFt: 0.5, heightFt: 0.5, cabIndex: 0 }, db);
+noNaN(tiny, "tiny");
+ok("tiny screen still ≥1 cabinet", tiny.cabCountW >= 1 && tiny.cabCountH >= 1);
+ok("tiny screen ≥1 port", tiny.ports >= 1);
+const big = PQM.computeQuote({ mode: "flat", productId: "outdoor", pitch: 6.67, widthFt: 60, heightFt: 30, cabIndex: 0 }, db);
+noNaN(big, "big");
+ok("big screen uses install 150 tier", big.lines[2].rate === 150);
+ok("quoteRef format VR-YYYY-####", /^VR-\d{4}-\d{4}$/.test(PQM.quoteRef()));
+
+console.log("\n────────────────────────────");
+console.log(`  RESULT: ${pass} passed, ${fail} failed`);
+console.log("────────────────────────────\n");
+process.exit(fail ? 1 : 0);

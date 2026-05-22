@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pixel Quote Max — Visual Rhyme</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Manrope:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --navy:#06001A; --navyLight:#0F0826; --purple:#793494; --magenta:#9d20d6;
+    --lavender:#c89dd9; --cream:#F5EFE6; --line:#2A1F3D;
+    --amber:#E5B454; --green:#7BC474; --red:#E26464; --wall:#8B7355;
+    --fr:'Fraunces',Georgia,serif; --mn:'Manrope',system-ui,sans-serif; --mo:'JetBrains Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--navy);color:var(--cream);font-family:var(--mn);}
+  button{font-family:var(--mn);}
+  input,select{font-family:var(--mo);}
+  .vr-scroll::-webkit-scrollbar{width:8px;}
+  .vr-scroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px;}
+
+  /* three-column cockpit; collapses to one column on narrow screens */
+  .vr-cockpit{display:grid;grid-template-columns:330px minmax(0,1fr) 360px;gap:18px;align-items:start;}
+  @media (max-width:1240px){ .vr-cockpit{grid-template-columns:1fr;} .vr-sticky{position:static!important;max-height:none!important;} }
+
+  .vr-print{display:none;}
+  @media print{
+    .vr-screen{display:none !important;}
+    .vr-print{display:block !important;}
+    @page{size:A4 portrait;margin:13mm;}
+    html,body{background:#fff !important;color:#1A1208 !important;}
+    .pg-break{break-before:page;}
+    .avoid-break{break-inside:avoid;}
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- Offline fallback DB. The editable master is pixel-data.xml (used when served over http). -->
+<script type="application/xml" id="fallback-db">
+<pixelData>
+  <meta currency="INR" curveSurchargePct="15" pixelsPerPortMini="650000" pixelsPerPortMicro="500000" controllerGst="18" installGst="18" />
+  <installTiers><tier maxArea="50" rate="300" /><tier maxArea="150" rate="200" /><tier maxArea="999999" rate="150" /></installTiers>
+  <controllers type="mini"><tier maxPorts="1" price="15000" /><tier maxPorts="2" price="25000" /><tier maxPorts="3" price="45000" /><tier maxPorts="5" price="75000" /><tier maxPorts="7" price="125000" /><tier maxPorts="999" price="150000" /></controllers>
+  <controllers type="micro"><tier maxPorts="3" price="125000" /><tier maxPorts="7" price="150000" /><tier maxPorts="12" price="200000" /><tier maxPorts="20" price="250000" /><tier maxPorts="999" price="350000" /></controllers>
+  <products>
+    <product id="outdoor" series="Reyansh Outdoor" type="MiniLED" env="outdoor" moduleW="320" moduleH="160">
+      <cabinet w="960" h="960" label="960×960mm" /><cabinet w="960" h="1280" label="960×1280mm" /><cabinet w="1280" h="1280" label="1280×1280mm" />
+      <pitch pp="6.67" rate="5000" gst="18" sku="Reyansh Outdoor P6.67" /><pitch pp="4" rate="5500" gst="18" sku="Reyansh Outdoor P4" /><pitch pp="3" rate="7250" gst="18" sku="Reyansh Outdoor P3" /><pitch pp="2.5" rate="12500" gst="18" sku="Reyansh Outdoor P2.5" />
+    </product>
+    <product id="indoor" series="Reyansh Indoor" type="MiniLED" env="indoor" moduleW="320" moduleH="160">
+      <cabinet w="640" h="480" label="640×480mm" />
+      <pitch pp="2.5" rate="7500" gst="18" sku="Reyansh Indoor P2.5" /><pitch pp="1.86" rate="10500" gst="18" sku="Reyansh Indoor P1.86" /><pitch pp="1.56" rate="23000" gst="28" sku="Reyansh Indoor P1.56" />
+    </product>
+    <product id="microled" series="Leynna MicroLED" type="MicroLED" env="indoor" moduleW="300" moduleH="168.75">
+      <cabinet w="600" h="337.5" label="600×337.5mm" /><cabinet w="609.6" h="342.9" label="609.6×342.9mm" />
+      <pitch pp="1.56" rate="23000" gst="28" sku="Leynna Cosmo P1.56" /><pitch pp="1.25" rate="25000" gst="28" sku="Leynna Cosmo P1.25" /><pitch pp="1.17" rate="23500" gst="28" sku="Leynna Cosmo P1.17" /><pitch pp="0.93" rate="35000" gst="28" sku="Leynna Sapphire P0.93" /><pitch pp="0.78" rate="60000" gst="28" sku="Leynna Sapphire P0.78" />
+    </product>
+  </products>
+</pixelData>
+</script>
+
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="engine.js"></script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo } = React;
+const E = PQM;
+const C = {
+  navy:"#06001A", navyLight:"#0F0826", purple:"#793494", magenta:"#9d20d6",
+  lavender:"#c89dd9", cream:"#F5EFE6", line:"#2A1F3D",
+  amber:"#E5B454", green:"#7BC474", red:"#E26464", wall:"#8B7355",
+};
+const FR="var(--fr)", MN="var(--mn)", MO="var(--mo)";
+const num=(n,d=0)=> (isFinite(n)? Number(n).toLocaleString(undefined,{maximumFractionDigits:d,minimumFractionDigits:d}) : "—");
+const verdictColor=(v)=>({EXCELLENT:C.green,"VERY GOOD":C.green,ACCEPTABLE:C.amber,FACETED:C.amber,SEVERE:C.red}[v]||C.lavender);
+
+/* ───────── VR logo (inline, no external asset) ───────── */
+const VRLogo = ({size=40}) => (
+  <svg viewBox="0 0 200.39 210.49" width={size} height={size} style={{flex:"0 0 auto"}}>
+    <path fill={C.magenta} d="M200.39,142.2c-6.18-13.33-16.84-26.1-31.54-30.22-9.01-2.62-18.31-2.22-27.51-.75,2.18-5.55,4.83-12.33,6.66-16.94l13.4.69c3.69.02,7.39-.91,10.63-2.7,10.48-5.49,14.55-19.75,8.53-29.94-2.06-4.08-7.79-5.44-11.51-2.78-11.05,6.47-19.94,16.47-25.2,28.14l-15.99-.83c9.55-29.69,20.47-45.32,54.44-49.92-14.63-1.31-31.02,1.53-41.94,12.21-6.78,6.49-11.08,14.74-14.4,23.45-3.72-4.66-8.26-10.34-11.34-14.23l7.3-11.26c1.87-3.19,2.9-6.86,2.98-10.55.49-11.82-9.83-22.48-21.66-22.35-4.56-.25-8.6,4.03-8.17,8.58.08,12.8,4.29,25.51,11.77,35.89l-8.71,13.43C77.18,48.99,69.1,31.73,82.1,0c-8.45,12.02-14.18,27.63-10.4,42.43,2.23,9.12,7.23,16.97,13.1,24.2-5.9.89-13.09,1.99-18,2.7l-6.1-11.95c-1.83-3.21-4.49-5.94-7.65-7.85-9.99-6.33-24.38-2.73-30.19,7.59-2.5,3.82-.82,9.46,3.35,11.36,11.13,6.33,24.24,9.04,36.97,7.75l7.27,14.26c-30.49,6.57-49.48,4.94-70.46-22.18,6.18,13.33,16.84,26.1,31.54,30.22,9.01,2.62,18.31,2.22,27.51.75-2.17,5.55-4.83,12.33-6.66,16.93l-13.4-.69c-3.69-.02-7.39.91-10.63,2.7-10.48,5.49-14.55,19.75-8.53,29.94,2.06,4.08,7.79,5.44,11.51,2.78,11.05-6.47,19.94-16.47,25.2-28.14l15.99.83c-9.55,29.69-20.47,45.32-54.44,49.92,14.63,1.31,31.02-1.53,41.94-12.21,6.78-6.49,11.08-14.74,14.4-23.45,3.72,4.66,8.27,10.34,11.34,14.24l-7.3,11.26c-1.87,3.19-2.9,6.86-2.98,10.55-.49,11.82,9.83,22.48,21.66,22.35,4.56.25,8.6-4.03,8.17-8.58-.08-12.8-4.29-25.51-11.77-35.89l8.71-13.43c20.94,23.12,29.01,40.38,16.02,72.11,8.45-12.02,14.18-27.63,10.4-42.43-2.23-9.12-7.23-16.97-13.1-24.2,5.9-.89,13.09-1.99,18-2.7l6.1,11.95c1.83,3.21,4.49,5.94,7.65,7.85,9.99,6.33,24.38,2.73,30.19-7.59,2.5-3.82.82-9.47-3.35-11.36-11.13-6.33-24.24-9.04-36.97-7.75l-7.27-14.26c30.49-6.57,49.48-4.94,70.46,22.18ZM110.7,138.17c-3.09-3.45-6.27-6.8-9.32-10.11l-2.21,3.41-9.73,15.01c-3.82-4.82-8.94-11.19-12.51-15.67,1.45-4.4,2.75-8.83,4.1-13.13l-4.06-.21-17.86-.92c2.27-5.72,5.22-13.34,7.32-18.66,4.54-.95,9.03-2.03,13.42-3.01l-1.85-3.62-8.13-15.93c6.09-.9,14.16-2.15,19.82-3,3.09,3.45,6.27,6.8,9.32,10.11l2.21-3.41,9.73-15.01c3.82,4.82,8.94,11.19,12.51,15.67-1.45,4.4-2.75,8.83-4.1,13.13l4.06.21,17.86.92c-2.27,5.72-5.22,13.34-7.32,18.67-4.54.95-9.03,2.03-13.42,3.01l1.85,3.62,8.13,15.93c-6.09.9-14.16,2.15-19.82,3Z"/>
+  </svg>
+);
+
+/* ───────── small UI atoms ───────── */
+function Field({label,unit,hint,children}){
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+      <label style={{fontSize:11,letterSpacing:1.2,textTransform:"uppercase",color:C.lavender,fontFamily:MN,fontWeight:600}}>
+        {label} {unit&&<span style={{opacity:.5}}>({unit})</span>}
+      </label>
+      {children}
+      {hint&&<div style={{fontSize:11,color:C.lavender,opacity:.6,fontFamily:MN}}>{hint}</div>}
+    </div>
+  );
+}
+function NumInput({value,onChange,min,max,step=1}){
+  return <input type="number" value={value} min={min} max={max} step={step}
+    onChange={(e)=>onChange(e.target.value===""?"":parseFloat(e.target.value))}
+    style={{background:C.navy,border:`1px solid ${C.line}`,color:C.cream,padding:"10px 12px",fontFamily:MO,fontSize:14,borderRadius:6,outline:"none",width:"100%"}} />;
+}
+function Pill({active,onClick,children}){
+  return <button onClick={onClick}
+    style={{background:active?C.purple:"transparent",color:active?C.cream:C.lavender,border:`1px solid ${active?C.purple:C.line}`,padding:"8px 14px",borderRadius:999,fontWeight:600,fontSize:12,letterSpacing:.6,textTransform:"uppercase",cursor:"pointer",transition:"all .15s"}}>
+    {children}</button>;
+}
+const headerBtn=(active)=>({background:active?C.magenta:"transparent",color:active?C.cream:C.lavender,border:`1px solid ${active?C.magenta:C.line}`,padding:"9px 16px",borderRadius:999,fontWeight:700,fontSize:12,letterSpacing:.8,textTransform:"uppercase",cursor:"pointer",transition:"all .15s"});
+function Panel({children,accent,style}){
+  return <div style={{background:C.navyLight,border:`1px solid ${C.line}`,borderLeft:accent?`3px solid ${accent}`:`1px solid ${C.line}`,borderRadius:12,padding:18,...style}}>{children}</div>;
+}
+function Metric({label,value,unit,accent,sub}){
+  return (
+    <div style={{borderTop:`1px solid ${C.line}`,padding:"12px 0"}}>
+      <div style={{fontSize:10,letterSpacing:1.4,textTransform:"uppercase",color:C.lavender,opacity:.7,fontWeight:600}}>{label}</div>
+      <div style={{display:"flex",alignItems:"baseline",gap:6,marginTop:4}}>
+        <span style={{fontFamily:FR,fontSize:24,fontWeight:500,color:accent||C.cream,lineHeight:1}}>{value}</span>
+        {unit&&<span style={{fontFamily:MO,fontSize:12,color:C.lavender,opacity:.7}}>{unit}</span>}
+      </div>
+      {sub&&<div style={{fontFamily:MO,fontSize:11,color:C.lavender,opacity:.6,marginTop:4}}>{sub}</div>}
+    </div>
+  );
+}
+
+/* ───────── drawings ───────── */
+function PlanDrawing({chord,R,sag,cabCountW,curveType}){
+  const W=560,H=320,pad=50, scale=(W-2*pad)/chord, cx=W/2;
+  const isOuter=curveType==="outer";
+  const wallY=isOuter?H-pad-30:pad+30, viewerY=isOuter?22:H-14, apexDir=isOuter?-1:1, half=chord/2;
+  const x1=cx-half*scale, x2=cx+half*scale, Rpx=R*scale, sweep=isOuter?1:0;
+  const arcPath=`M ${x1} ${wallY} A ${Rpx} ${Rpx} 0 0 ${sweep} ${x2} ${wallY}`;
+  const arcPoint=(t)=>{const xc=-half+t*chord;const yo=Math.sqrt(Math.max(0,R*R-xc*xc))-(R-sag);return{x:cx+xc*scale,y:wallY+apexDir*yo*scale};};
+  const ticks=[]; const n=Math.max(1,Math.round(cabCountW)); for(let i=0;i<=n;i++) ticks.push(arcPoint(i/n));
+  const apex=arcPoint(.5);
+  const struts=[.25,.5,.75].map(t=>{const p=arcPoint(t);const wx=cx+(-half+t*chord)*scale;return{from:{x:wx,y:wallY},to:p};});
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",height:"auto",display:"block"}}>
+      <defs><pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke={C.line} strokeWidth="0.5" opacity="0.4"/></pattern>
+      <pattern id="wh" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke={C.wall} strokeWidth="1.5"/></pattern></defs>
+      <rect width={W} height={H} fill={C.navyLight}/><rect width={W} height={H} fill="url(#grid)"/>
+      <text x={pad} y={24} fontSize="10" fill={C.lavender} opacity="0.7" fontWeight="600" letterSpacing="2">PLAN VIEW · {isOuter?"OUTER (CONVEX)":"INNER (CONCAVE)"}</text>
+      <rect x={x1-30} y={isOuter?wallY:wallY-14} width={chord*scale+60} height={14} fill="url(#wh)" opacity="0.7"/>
+      <line x1={x1-30} y1={wallY} x2={x2+30} y2={wallY} stroke={C.wall} strokeWidth="2"/>
+      <text x={cx} y={isOuter?wallY+28:wallY-20} textAnchor="middle" fontSize="10" fill={C.wall} fontWeight="700" letterSpacing="1.5">BUILDING WALL</text>
+      <text x={cx} y={viewerY} textAnchor="middle" fontSize="11" fill={C.amber} fontWeight="700" letterSpacing="1.5">{isOuter?"↑ VIEWER / STREET":"↓ VIEWER"}</text>
+      {struts.map((s,i)=>(<line key={i} x1={s.from.x} y1={s.from.y} x2={s.to.x} y2={s.to.y} stroke={C.lavender} strokeWidth="1" strokeDasharray="2 3" opacity="0.35"/>))}
+      <circle cx={x1} cy={wallY} r="5" fill={C.amber}/><circle cx={x2} cy={wallY} r="5" fill={C.amber}/>
+      <path d={arcPath} fill="none" stroke={C.lavender} strokeWidth="1.5" opacity="0.35"/>
+      <path d={`M ${arcPoint(0).x} ${arcPoint(0).y} A ${Rpx} ${Rpx} 0 0 ${sweep} ${arcPoint(1).x} ${arcPoint(1).y}`} fill="none" stroke={C.magenta} strokeWidth="4"/>
+      {ticks.map((p,i)=>(<circle key={i} cx={p.x} cy={p.y} r="2.5" fill={C.cream}/>))}
+      <line x1={apex.x-22} y1={apex.y} x2={apex.x-22} y2={wallY} stroke={C.green} strokeWidth="1.2"/>
+      <text x={apex.x-30} y={(apex.y+wallY)/2+4} textAnchor="end" fontSize="10" fill={C.green} fontFamily={MO} fontWeight="600">S={num(sag,0)}</text>
+      <text x={apex.x+8} y={apex.y+(isOuter?-10:16)} fontSize="10" fill={C.amber} fontFamily={MO} fontWeight="600">R={num(R/1000,2)}m</text>
+      <text x={cx} y={isOuter?Math.min(arcPoint(0).y,apex.y)-16:Math.max(arcPoint(0).y,apex.y)+22} textAnchor="middle" fontSize="11" fill={C.magenta} fontWeight="700">LED SCREEN · {Math.round(cabCountW)} CABINETS WIDE</text>
+    </svg>
+  );
+}
+function ElevationDrawing({wmm,hmm,cabCountW,cabCountH,modPerCabW,modPerCabH,accent}){
+  const W=560,H=320,pad=30, aspect=wmm/hmm;
+  let dW=W-2*pad, dH=dW/aspect; if(dH>H-2*pad-40){dH=H-2*pad-40;dW=dH*aspect;}
+  const x0=(W-dW)/2,y0=44, cpw=dW/cabCountW, cph=dH/cabCountH, cabs=[];
+  for(let r=0;r<cabCountH;r++)for(let c=0;c<cabCountW;c++)cabs.push({x:x0+c*cpw,y:y0+r*cph,idx:r*cabCountW+c+1});
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",height:"auto",display:"block"}}>
+      <defs><pattern id="grid2" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke={C.line} strokeWidth="0.5" opacity="0.4"/></pattern>
+      <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C.purple} stopOpacity="0.45"/><stop offset="100%" stopColor={C.magenta} stopOpacity="0.25"/></linearGradient></defs>
+      <rect width={W} height={H} fill={C.navyLight}/><rect width={W} height={H} fill="url(#grid2)"/>
+      <text x={pad} y={24} fontSize="10" fill={C.lavender} opacity="0.7" fontWeight="600" letterSpacing="2">FRONT ELEVATION · VIEWER PERSPECTIVE</text>
+      <rect x={x0-2} y={y0-2} width={dW+4} height={dH+4} fill="none" stroke={accent||C.amber} strokeWidth="1.5"/>
+      {cabs.map((cb,i)=>(
+        <g key={i}>
+          <rect x={cb.x} y={cb.y} width={cpw} height={cph} fill="url(#cg)" stroke={C.magenta} strokeWidth="0.8"/>
+          {[...Array(Math.max(0,modPerCabW-1))].map((_,j)=>(<line key={"v"+j} x1={cb.x+((j+1)*cpw)/modPerCabW} y1={cb.y} x2={cb.x+((j+1)*cpw)/modPerCabW} y2={cb.y+cph} stroke={C.lavender} strokeWidth="0.4" opacity="0.5"/>))}
+          {[...Array(Math.max(0,modPerCabH-1))].map((_,j)=>(<line key={"h"+j} x1={cb.x} y1={cb.y+((j+1)*cph)/modPerCabH} x2={cb.x+cpw} y2={cb.y+((j+1)*cph)/modPerCabH} stroke={C.lavender} strokeWidth="0.4" opacity="0.5"/>))}
+          {cpw>34&&<text x={cb.x+cpw/2} y={cb.y+cph/2+3} textAnchor="middle" fontSize="9" fill={C.cream} fontFamily={MO} opacity="0.85">C{cb.idx}</text>}
+        </g>
+      ))}
+      <text x={x0+dW/2} y={y0+dH+22} textAnchor="middle" fontSize="10" fill={C.lavender} fontFamily={MO}>← {num(wmm)} mm · {cabCountW} cab × {modPerCabW} mod →</text>
+      <text x={x0-10} y={y0+dH/2} textAnchor="middle" fontSize="10" fill={C.lavender} fontFamily={MO} transform={`rotate(-90 ${x0-10} ${y0+dH/2})`}>{num(hmm)} mm · {cabCountH} × {modPerCabH}</text>
+    </svg>
+  );
+}
+function SectionDrawing({sag,curveType}){
+  const W=340,H=320, isOuter=curveType==="outer", wallX=60;
+  const sagScale=Math.min(160/Math.max(sag,100),0.35), vSag=Math.max(sag*sagScale,30);
+  const faceX=wallX+(isOuter?vSag:vSag), topY=60, botY=H-80;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",height:"auto",display:"block"}}>
+      <defs><pattern id="grid3" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke={C.line} strokeWidth="0.5" opacity="0.4"/></pattern>
+      <pattern id="wh2" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke={C.wall} strokeWidth="1.2"/></pattern></defs>
+      <rect width={W} height={H} fill={C.navyLight}/><rect width={W} height={H} fill="url(#grid3)"/>
+      <text x={20} y={22} fontSize="10" fill={C.lavender} opacity="0.7" fontWeight="600" letterSpacing="2">SIDE SECTION</text>
+      <rect x={wallX-16} y={topY-30} width={16} height={botY-topY+50} fill="url(#wh2)" opacity="0.8"/>
+      <line x1={wallX} y1={topY-30} x2={wallX} y2={botY+20} stroke={C.wall} strokeWidth="2.5"/>
+      <text x={wallX-22} y={(topY+botY)/2} textAnchor="middle" fontSize="9" fill={C.wall} fontWeight="700" transform={`rotate(-90 ${wallX-22} ${(topY+botY)/2})`}>BUILDING WALL</text>
+      <line x1={faceX-8} y1={topY-10} x2={faceX-8} y2={botY+10} stroke={C.amber} strokeWidth="2"/>
+      <text x={faceX-12} y={topY-16} textAnchor="end" fontSize="8" fill={C.amber} fontFamily={MO}>BACK FRAME</text>
+      <rect x={faceX} y={topY} width={6} height={botY-topY} fill={C.magenta} opacity="0.9"/>
+      <text x={faceX+12} y={(topY+botY)/2-5} fontSize="9" fill={C.magenta} fontWeight="700">LED FACE</text>
+      {[topY+20,(topY+botY)/2,botY-20].map((y,i)=>(<line key={i} x1={wallX} y1={y} x2={faceX-8} y2={y} stroke={C.purple} strokeWidth="1.5"/>))}
+      <line x1={wallX} y1={botY+50} x2={faceX} y2={botY+50} stroke={C.green} strokeWidth="1.2"/>
+      <text x={(wallX+faceX)/2} y={botY+65} textAnchor="middle" fontSize="11" fill={C.green} fontFamily={MO} fontWeight="600">{num(sag,0)} mm</text>
+      <text x={(wallX+faceX)/2} y={botY+77} textAnchor="middle" fontSize="8" fill={C.green} fontFamily={MO} opacity="0.7">{isOuter?"cantilever @ apex":"depth into wall"}</text>
+    </svg>
+  );
+}
+
+/* ───────── price table ───────── */
+function PriceTable({r,paper}){
+  const ink=paper?"#1A1208":C.cream, muted=paper?"#6B5E4A":C.lavender, bd=paper?"#E4DCCB":C.line;
+  const th={padding:"7px 8px",textAlign:"left",fontSize:9,textTransform:"uppercase",letterSpacing:1,color:muted,borderBottom:`1px solid ${bd}`,fontWeight:700};
+  const td={padding:"7px 8px",fontSize:12,borderBottom:`1px solid ${bd}`,color:ink};
+  const tr={...td,textAlign:"right",fontFamily:MO,fontWeight:600};
+  return (
+    <table style={{width:"100%",borderCollapse:"collapse"}}>
+      <thead><tr><th style={th}>Item</th><th style={th}>Rate</th><th style={th}>Qty</th><th style={{...th,textAlign:"right"}}>Amount</th><th style={{...th,textAlign:"right"}}>GST%</th><th style={{...th,textAlign:"right"}}>GST</th></tr></thead>
+      <tbody>{r.lines.map((l,i)=>(
+        <tr key={i}><td style={td}>{l.item}</td><td style={td}>{l.rateUnit==="%"?l.rate+"%":(l.item==="Video Controller"?"Per system":E.fmtINR(l.rate)+l.rateUnit)}</td><td style={td}>{l.qty}</td><td style={tr}>{E.fmtINR(l.amount)}</td><td style={tr}>{l.gstPct}%</td><td style={tr}>{E.fmtINR(l.gst)}</td></tr>
+      ))}</tbody>
+      <tfoot>
+        <tr><td colSpan="3" style={{...td,fontWeight:700,borderTop:`2px solid ${bd}`}}>Subtotal</td><td style={{...tr,borderTop:`2px solid ${bd}`}}>{E.fmtINR(r.subtotal)}</td><td style={tr}></td><td style={{...tr,borderTop:`2px solid ${bd}`}}>{E.fmtINR(r.totalGst)}</td></tr>
+        <tr><td colSpan="3" style={{...td,fontWeight:800,fontSize:14,color:paper?C.magenta:C.lavender,border:"none"}}>Grand Total (incl. GST)</td><td colSpan="3" style={{...tr,fontWeight:800,fontSize:16,color:paper?C.magenta:C.lavender,border:"none"}}>{E.fmtINR(r.grandTotal)}</td></tr>
+      </tfoot>
+    </table>
+  );
+}
+
+/* ───────── print / PDF sheet ───────── */
+function PrintSheet({r,meta,preview}){
+  if(!r) return null;
+  const ink="#1A1208",muted="#6B5E4A",mg=C.magenta;
+  const Row=({k,v,accent})=>(
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"6px 0",borderBottom:"1px solid #E4DCCB"}}>
+      <span style={{fontSize:11,letterSpacing:.4,textTransform:"uppercase",color:muted,fontWeight:600}}>{k}</span>
+      <span style={{fontFamily:MO,fontSize:12.5,fontWeight:600,color:accent||ink}}>{v}</span>
+    </div>
+  );
+  const SectionH=({children})=>(<div style={{fontSize:11,letterSpacing:2,color:mg,fontWeight:700,textTransform:"uppercase",margin:"16px 0 8px"}}>{children}</div>);
+  const cv=r.curve;
+  return (
+    <div className={preview?"":"vr-print"} style={{background:"#fff",color:ink,fontFamily:MN,padding:0,display:preview?"block":undefined}}>
+      {/* header */}
+      <div className="avoid-break" style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",borderBottom:`2px solid ${mg}`,paddingBottom:12}}>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <VRLogo size={42}/>
+          <div>
+            <div style={{fontSize:10,letterSpacing:4,color:mg,fontWeight:700,textTransform:"uppercase"}}>Visual Rhyme Pvt. Ltd.</div>
+            <div style={{fontFamily:FR,fontSize:26,fontWeight:600,marginTop:2,lineHeight:1}}>Pixel Quote Max — {r.mode==="curved"?"Curved":"Flat"} LED {r.mode==="curved"?"Spec & Quote":"Quotation"}</div>
+          </div>
+        </div>
+        <div style={{textAlign:"right",fontFamily:MO,fontSize:11,color:muted}}>
+          <div style={{fontSize:13,color:ink,fontWeight:700}}>{meta.project||"Untitled Project"}</div>
+          {meta.client&&<div style={{marginTop:2}}>{meta.client}</div>}
+          <div style={{marginTop:2}}>{meta.ref}</div>
+          <div>{meta.date}</div>
+        </div>
+      </div>
+
+      {/* drawings — mandatory in both modes */}
+      <SectionH>Drawings</SectionH>
+      <div className="avoid-break" style={{display:"grid",gridTemplateColumns: r.mode==="curved"?"1fr 1fr":"1fr",gap:14}}>
+        <div style={{border:"1px solid #E4DCCB",borderRadius:6,overflow:"hidden"}}>
+          <ElevationDrawing wmm={r.builtWmm} hmm={r.builtHmm} cabCountW={r.cabCountW} cabCountH={r.cabCountH} modPerCabW={r.modPerCabW} modPerCabH={r.modPerCabH}/>
+        </div>
+        {r.mode==="curved"&&(
+          <div style={{border:"1px solid #E4DCCB",borderRadius:6,overflow:"hidden"}}>
+            <PlanDrawing chord={cv.chordMm} R={cv.R} sag={cv.sag} cabCountW={r.cabCountW} curveType={cv.curveType}/>
+          </div>
+        )}
+      </div>
+      {r.mode==="curved"&&(
+        <div className="avoid-break" style={{border:"1px solid #E4DCCB",borderRadius:6,overflow:"hidden",marginTop:14,maxWidth:300}}>
+          <SectionDrawing sag={cv.sag} curveType={cv.curveType}/>
+        </div>
+      )}
+
+      {/* spec */}
+      <div className="avoid-break" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginTop:6}}>
+        <div>
+          <SectionH>Configuration</SectionH>
+          <Row k="Product" v={r.product.series}/>
+          <Row k="Type / SKU" v={r.sku}/>
+          <Row k="Pixel pitch" v={r.pitch+" mm"}/>
+          <Row k="Requested size" v={`${num(r.reqWmm/304.8,2)} × ${num(r.reqHmm/304.8,2)} ft`}/>
+          <Row k="Built size" v={`${num(r.builtWft,2)} × ${num(r.builtHft,2)} ft`} accent={mg}/>
+          <Row k="Cabinet" v={r.cab.label}/>
+          {r.mode==="curved"&&<Row k="Curve type" v={cv.curveType==="outer"?"Outer / Convex":"Inner / Concave"}/>}
+        </div>
+        <div>
+          <SectionH>Build Quantities</SectionH>
+          <Row k="Cabinets (W × H)" v={`${r.cabCountW} × ${r.cabCountH} = ${r.totalCabs}`} accent={mg}/>
+          <Row k="Modules / cabinet" v={`${r.modPerCabW} × ${r.modPerCabH} = ${r.modPerCab}`}/>
+          <Row k="Total modules" v={num(r.totalMods)}/>
+          <Row k="Pixel resolution" v={`${num(r.pxW)} × ${num(r.pxH)} px`}/>
+          <Row k="Total pixels" v={num(r.totalPixels)}/>
+          <Row k="Active area" v={`${num(r.areaSqft,1)} sqft`}/>
+          <Row k="Controller ports" v={String(r.ports)}/>
+        </div>
+      </div>
+
+      {/* curved geometry + structure */}
+      {r.mode==="curved"&&(
+        <div className="avoid-break" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginTop:6}}>
+          <div>
+            <SectionH>Curve Geometry</SectionH>
+            <Row k="Radius (R)" v={`${num(cv.R/1000,2)} m`} accent={C.amber}/>
+            <Row k={cv.curveType==="outer"?"Sagitta · cantilever":"Sagitta · depth"} v={`${num(cv.sag,0)} mm`}/>
+            <Row k="Arc length" v={`${num(cv.arcLen,0)} mm`}/>
+            <Row k="Per-joint back gap" v={`${num(cv.gapPerJoint,1)} mm`} accent={verdictColor(cv.verdict)}/>
+            <Row k="Per-cabinet wedge" v={`${num(cv.cabAngleDeg,2)}°`}/>
+            <Row k="Curve verdict" v={cv.verdict} accent={verdictColor(cv.verdict)}/>
+          </div>
+          <div>
+            <SectionH>Structure & Power</SectionH>
+            <Row k="Mounting strategy" v={cv.structuralStrategy}/>
+            <Row k="Cantilever @ centre" v={`${num(cv.cantileverAtCenter,0)} mm`}/>
+            <Row k="Steel structure (est.)" v={`~${num(cv.steelWeightKg,0)} kg`}/>
+            <Row k="Screen weight" v={`${num(cv.totalWeight,0)} kg`}/>
+            <Row k="Recommended supply" v={`${num(cv.recommendedSupply)} kW`} accent={mg}/>
+            <Row k="Peak power" v={`${num(cv.maxPower/1000,2)} kW`}/>
+          </div>
+        </div>
+      )}
+
+      {/* quote */}
+      <SectionH>Quotation</SectionH>
+      <div className="avoid-break"><PriceTable r={r} paper/></div>
+
+      {/* notes */}
+      <div className="avoid-break" style={{marginTop:16,fontSize:10.5,lineHeight:1.6,color:muted}}>
+        <strong style={{color:ink}}>Notes:</strong> ACP, scaffolding, H-frame priced as actual. Quote valid 7 working days.
+        All prices inclusive of GST as itemised. Transportation, fabrication & electrical work charged additional unless specified.
+        {r.mode==="curved"&&<span style={{display:"block",marginTop:6,fontStyle:"italic",color:C.wall}}>Pre-engineering estimates for scoping only. Final structural design, anchor specification and wind-load verification must be stamped by a licensed structural engineer per local code (IS 875 Part 3 for wind in India).</span>}
+      </div>
+      <div style={{marginTop:16,paddingTop:10,borderTop:"1px solid #E4DCCB",fontSize:9.5,color:muted,textAlign:"center",letterSpacing:.5}}>
+        VISUAL RHYME PVT. LTD. · 913, Avirat Silver Radiance 4, SG Hwy, Gota, Ahmedabad-382481 · visualrhyme.digital
+      </div>
+    </div>
+  );
+}
+
+/* ───────── main app ───────── */
+const Q = (typeof location!=="undefined") ? new URLSearchParams(location.search) : new URLSearchParams();
+const qDef = (k,d)=> Q.get(k)!==null ? Q.get(k) : d;
+
+function App(){
+  const [db,setDb]=useState(null);
+  const [dbErr,setDbErr]=useState("");
+  const [mode,setMode]=useState(qDef("mode","flat")==="curved"?"curved":"flat");
+  const [productId,setProductId]=useState(qDef("product","outdoor"));
+  const [pitch,setPitch]=useState(4);
+  const [cabIndex,setCabIndex]=useState(0);
+  const [widthFt,setWidthFt]=useState(parseFloat(qDef("w","12"))||12);
+  const [heightFt,setHeightFt]=useState(parseFloat(qDef("h","8"))||8);
+  const [curveMode,setCurveMode]=useState("preset");
+  const [preset,setPreset]=useState("signature");
+  const [sagittaMm,setSagittaMm]=useState(457);
+  const [radiusMm,setRadiusMm]=useState(8000);
+  const [curveType,setCurveType]=useState("outer");
+  const [cabWeightKg,setCabWeightKg]=useState(14);
+  const [stageTab,setStageTab]=useState("elevation");
+  const [project,setProject]=useState("");
+  const [client,setClient]=useState("");
+
+  // load XML db (served) with offline fallback
+  useEffect(()=>{
+    let done=false;
+    fetch("pixel-data.xml").then(res=>{if(!res.ok)throw 0;return res.text();})
+      .then(txt=>{if(!done){setDb(E.parseDbXml(txt));}})
+      .catch(()=>{
+        const fb=document.getElementById("fallback-db");
+        if(fb){setDb(E.parseDbXml(fb.textContent));setDbErr("offline");}
+        else setDbErr("Could not load pixel-data.xml");
+      });
+    return ()=>{done=true;};
+  },[]);
+
+  const product = db ? E.getProduct(db,productId) : null;
+
+  // keep pitch / cabinet / module valid when product changes
+  useEffect(()=>{
+    if(!product) return;
+    if(!product.pitches.find(p=>Math.abs(p.pp-pitch)<1e-9)) setPitch(product.pitches[0].pp);
+    if(cabIndex>product.cabinets.length-1) setCabIndex(0);
+  },[productId,db]);
+
+  const result = useMemo(()=>{
+    if(!db||!product) return null;
+    try{
+      return E.computeQuote({
+        mode,productId,pitch,
+        widthFt:Number(widthFt)||0,heightFt:Number(heightFt)||0,cabIndex,
+        curveMode,preset,sagittaMm:Number(sagittaMm)||0,radiusMm:Number(radiusMm)||0,
+        curveType,cabWeightKg:Number(cabWeightKg)||14,
+      },db);
+    }catch(e){return null;}
+  },[db,product,mode,productId,pitch,widthFt,heightFt,cabIndex,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg]);
+
+  const meta = useMemo(()=>({project,client,ref:E.quoteRef(),date:new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})}),[project,client,result]);
+
+  if(!db) return <div style={{padding:40,fontFamily:MN,color:C.lavender}}>{dbErr&&dbErr!=="offline"?("⚠ "+dbErr):"Loading product database…"}</div>;
+  if(!result) return <div style={{padding:40,color:C.red}}>Enter a valid size to compute.</div>;
+
+  // on-screen A4 preview of the print/PDF sheet — for QC and quick visual check
+  if(Q.get("sheet")==="1"){
+    return <div style={{background:"#9a9a9a",minHeight:"100vh",padding:24}}>
+      <div style={{maxWidth:794,margin:"0 auto",background:"#fff",padding:"13mm",boxShadow:"0 10px 40px rgba(0,0,0,.4)"}}>
+        <PrintSheet r={result} meta={meta} preview/>
+      </div>
+    </div>;
+  }
+  const cv=result.curve;
+  const valid = (Number(widthFt)>0 && Number(heightFt)>0);
+
+  const stageTabs = mode==="curved" ? [{k:"plan",l:"Plan"},{k:"elevation",l:"Elevation"},{k:"section",l:"Section"}] : [{k:"elevation",l:"Elevation"}];
+  const presets=[{key:"subtle",l:"Subtle",d:"R = 5× width"},{key:"signature",l:"Signature",d:"R = 2.5× width"},{key:"wrap",l:"Wrap",d:"R = 1.3× width"},{key:"cylinder",l:"Cylinder",d:"R = 0.8× width"}];
+
+  return (
+    <div className="vr-screen" style={{minHeight:"100vh",background:C.navy}}>
+      {/* top bar */}
+      <div style={{position:"sticky",top:0,zIndex:50,background:C.navy+"E6",backdropFilter:"blur(10px)",borderBottom:`1px solid ${C.line}`}}>
+        <div style={{maxWidth:1500,margin:"0 auto",padding:"12px 22px",display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+          <div style={{marginRight:"auto",display:"flex",alignItems:"center",gap:12}}>
+            <VRLogo size={36}/>
+            <div>
+              <div style={{fontSize:10,letterSpacing:3,color:C.magenta,fontWeight:700,textTransform:"uppercase"}}>Visual Rhyme</div>
+              <div style={{fontFamily:FR,fontSize:23,fontWeight:600,lineHeight:1,marginTop:2}}>Pixel Quote <em style={{color:C.lavender}}>Max</em></div>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>{setMode("flat");setStageTab("elevation");}} style={headerBtn(mode==="flat")}>▭ Flat</button>
+            <button onClick={()=>{setMode("curved");setStageTab("plan");}} style={headerBtn(mode==="curved")}>◠ Curved</button>
+          </div>
+          <input value={project} onChange={e=>setProject(e.target.value)} placeholder="Project name"
+            style={{background:C.navyLight,border:`1px solid ${C.line}`,color:C.cream,padding:"9px 12px",fontFamily:MN,fontSize:13,borderRadius:8,outline:"none",width:160}}/>
+          <input value={client} onChange={e=>setClient(e.target.value)} placeholder="Client (optional)"
+            style={{background:C.navyLight,border:`1px solid ${C.line}`,color:C.cream,padding:"9px 12px",fontFamily:MN,fontSize:13,borderRadius:8,outline:"none",width:150}}/>
+          <button onClick={()=>window.print()} disabled={!valid} style={{...headerBtn(false),background:C.purple,borderColor:C.purple,color:C.cream,opacity:valid?1:.5}}>⤓ Export PDF</button>
+        </div>
+      </div>
+
+      <div style={{maxWidth:1500,margin:"0 auto",padding:22}}>
+        <div className="vr-cockpit">
+
+          {/* INPUTS */}
+          <div className="vr-sticky vr-scroll" style={{position:"sticky",top:80,maxHeight:"calc(100vh - 104px)",overflowY:"auto",paddingRight:4}}>
+            <Panel>
+              <h2 style={{fontFamily:FR,fontSize:19,margin:"0 0 2px"}}>Inputs</h2>
+              <div style={{fontSize:11,color:C.lavender,opacity:.7,marginBottom:16}}>Screen size in feet · cabinet/curve in mm</div>
+
+              <div style={{fontSize:10,letterSpacing:2,color:C.magenta,textTransform:"uppercase",fontWeight:700,marginBottom:10}}>1 · Product</div>
+              <Field label="Series">
+                <select value={productId} onChange={e=>{setProductId(e.target.value);}} style={{background:C.navy,border:`1px solid ${C.line}`,color:C.cream,padding:"10px 12px",fontFamily:MN,fontSize:13,borderRadius:6,width:"100%"}}>
+                  {db.products.map(p=><option key={p.id} value={p.id} style={{background:C.navyLight}}>{p.series} ({p.type})</option>)}
+                </select>
+              </Field>
+              <div style={{marginTop:12}}>
+                <Field label="Pixel pitch" unit="mm">
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                    {product.pitches.map(p=><button key={p.pp} onClick={()=>setPitch(p.pp)} style={{padding:"7px 12px",background:pitch===p.pp?C.purple:C.navy,border:`1px solid ${pitch===p.pp?C.purple:C.line}`,borderRadius:8,color:C.cream,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:MO}}>P{p.pp}</button>)}
+                  </div>
+                </Field>
+              </div>
+              {product.cabinets.length>1&&(
+                <div style={{marginTop:12}}>
+                  <Field label="Cabinet">
+                    <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                      {product.cabinets.map((c,i)=><button key={i} onClick={()=>setCabIndex(i)} style={{padding:"7px 11px",background:cabIndex===i?C.purple:C.navy,border:`1px solid ${cabIndex===i?C.purple:C.line}`,borderRadius:8,color:C.cream,fontSize:10,fontWeight:600,cursor:"pointer",fontFamily:MO}}>{c.label}</button>)}
+                    </div>
+                  </Field>
+                </div>
+              )}
+
+              <div style={{fontSize:10,letterSpacing:2,color:C.magenta,textTransform:"uppercase",fontWeight:700,margin:"22px 0 10px"}}>2 · Screen Size</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                <Field label="Width" unit="ft" hint={`${num(Number(widthFt)*304.8,0)} mm`}><NumInput value={widthFt} onChange={setWidthFt} min={0.5} max={200} step={0.5}/></Field>
+                <Field label="Height" unit="ft" hint={`${num(Number(heightFt)*304.8,0)} mm`}><NumInput value={heightFt} onChange={setHeightFt} min={0.5} max={100} step={0.5}/></Field>
+              </div>
+
+              {mode==="curved"&&(
+                <div>
+                  <div style={{fontSize:10,letterSpacing:2,color:C.magenta,textTransform:"uppercase",fontWeight:700,margin:"22px 0 10px"}}>3 · Curve</div>
+                  <div style={{display:"flex",gap:8,marginBottom:12}}>
+                    <button onClick={()=>setCurveType("outer")} style={headerBtn(curveType==="outer")}>Outer</button>
+                    <button onClick={()=>setCurveType("inner")} style={headerBtn(curveType==="inner")}>Inner</button>
+                  </div>
+                  <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+                    <Pill active={curveMode==="preset"} onClick={()=>setCurveMode("preset")}>Preset</Pill>
+                    <Pill active={curveMode==="sagitta"} onClick={()=>setCurveMode("sagitta")}>Sagitta</Pill>
+                    <Pill active={curveMode==="radius"} onClick={()=>setCurveMode("radius")}>Radius</Pill>
+                  </div>
+                  {curveMode==="preset"&&(
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                      {presets.map(p=><button key={p.key} onClick={()=>setPreset(p.key)} style={{background:preset===p.key?C.purple:C.navy,color:preset===p.key?C.cream:C.lavender,border:`1px solid ${preset===p.key?C.purple:C.line}`,borderRadius:6,padding:"9px 8px",cursor:"pointer",textAlign:"left"}}><div style={{fontWeight:700,fontSize:13}}>{p.l}</div><div style={{fontSize:10,opacity:.7,fontFamily:MO,marginTop:2}}>{p.d}</div></button>)}
+                    </div>
+                  )}
+                  {curveMode==="sagitta"&&<Field label={`Sagitta (${curveType==="outer"?"bulge out":"depth in"})`} unit="mm" hint={`= ${num(Number(sagittaMm)/304.8,2)} ft`}><NumInput value={sagittaMm} onChange={setSagittaMm} min={10} step={5}/></Field>}
+                  {curveMode==="radius"&&<Field label="Radius" unit="mm" hint={`= ${num(Number(radiusMm)/1000,2)} m`}><NumInput value={radiusMm} onChange={setRadiusMm} min={500} step={50}/></Field>}
+                  <div style={{marginTop:12}}>
+                    <Field label="Cabinet weight" unit="kg" hint="outdoor diecast 12–18 kg"><NumInput value={cabWeightKg} onChange={setCabWeightKg} min={3} max={50} step={0.5}/></Field>
+                  </div>
+                </div>
+              )}
+            </Panel>
+          </div>
+
+          {/* STAGE */}
+          <div style={{display:"flex",flexDirection:"column",gap:16,minWidth:0}}>
+            <div style={{position:"relative",borderRadius:16,overflow:"hidden",border:`1px solid ${C.line}`,background:C.navyLight}}>
+              <div style={{position:"absolute",inset:0,background:`radial-gradient(circle at 50% 40%, ${C.magenta}22 0%, transparent 60%)`,pointerEvents:"none"}}/>
+              <div style={{position:"relative",display:"flex",gap:8,padding:"14px 16px 0",flexWrap:"wrap"}}>
+                {stageTabs.map(t=><button key={t.k} onClick={()=>setStageTab(t.k)} style={headerBtn(stageTab===t.k)}>{t.l}</button>)}
+                <div style={{marginLeft:"auto",alignSelf:"center",fontFamily:MO,fontSize:11,color:C.lavender,opacity:.7}}>{mode==="curved"?(curveType==="outer"?"OUTER · CONVEX":"INNER · CONCAVE"):"FLAT PANEL"}</div>
+              </div>
+              <div style={{position:"relative",padding:16}}>
+                {stageTab==="elevation"&&<ElevationDrawing wmm={result.builtWmm} hmm={result.builtHmm} cabCountW={result.cabCountW} cabCountH={result.cabCountH} modPerCabW={result.modPerCabW} modPerCabH={result.modPerCabH}/>}
+                {stageTab==="plan"&&cv&&<PlanDrawing chord={cv.chordMm} R={cv.R} sag={cv.sag} cabCountW={result.cabCountW} curveType={cv.curveType}/>}
+                {stageTab==="section"&&cv&&<div style={{maxWidth:380,margin:"0 auto"}}><SectionDrawing sag={cv.sag} curveType={cv.curveType}/></div>}
+              </div>
+            </div>
+
+            {mode==="curved"&&cv&&(
+              <div style={{background:`linear-gradient(90deg, ${verdictColor(cv.verdict)}22 0%, transparent 100%)`,border:`1px solid ${verdictColor(cv.verdict)}`,borderRadius:12,padding:16,display:"flex",gap:18,alignItems:"center",flexWrap:"wrap"}}>
+                <div style={{minWidth:110}}>
+                  <div style={{fontSize:11,letterSpacing:1.5,color:C.lavender,textTransform:"uppercase"}}>Curve Verdict</div>
+                  <div style={{fontFamily:FR,fontSize:26,fontWeight:600,color:verdictColor(cv.verdict),marginTop:2}}>{cv.verdict}</div>
+                </div>
+                <div style={{flex:1,minWidth:220,fontSize:13,lineHeight:1.5}}>
+                  <strong style={{color:verdictColor(cv.verdict)}}>Per-joint gap: {num(cv.gapPerJoint,1)} mm</strong> · Wedge: {num(cv.cabAngleDeg,2)}°<br/>
+                  <span style={{opacity:.85}}>{cv.advice}</span>
+                </div>
+              </div>
+            )}
+
+            {mode==="curved"&&cv&&(
+              <Panel accent={C.amber}>
+                <div style={{fontSize:10,letterSpacing:2,color:C.amber,textTransform:"uppercase",fontWeight:700,marginBottom:6}}>Mounting Strategy · {cv.curveType==="outer"?"Outer Curve":"Inner Curve"}</div>
+                <h3 style={{fontFamily:FR,fontSize:21,margin:"0 0 12px",fontWeight:500}}>{cv.structuralStrategy}</h3>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10}}>
+                  <div style={{padding:12,background:C.navy,borderRadius:6}}><div style={{fontSize:10,color:C.lavender,opacity:.7,letterSpacing:1.2,textTransform:"uppercase"}}>Cantilever @ centre</div><div style={{fontFamily:FR,fontSize:20,color:C.green,marginTop:4}}>{num(cv.cantileverAtCenter,0)} mm</div></div>
+                  <div style={{padding:12,background:C.navy,borderRadius:6}}><div style={{fontSize:10,color:C.lavender,opacity:.7,letterSpacing:1.2,textTransform:"uppercase"}}>Steel weight</div><div style={{fontFamily:FR,fontSize:20,color:C.cream,marginTop:4}}>~{num(cv.steelWeightKg,0)} kg</div></div>
+                  <div style={{padding:12,background:C.navy,borderRadius:6}}><div style={{fontSize:10,color:C.lavender,opacity:.7,letterSpacing:1.2,textTransform:"uppercase"}}>Recommended supply</div><div style={{fontFamily:FR,fontSize:20,color:C.magenta,marginTop:4}}>{num(cv.recommendedSupply)} kW</div></div>
+                </div>
+                <p style={{fontSize:11,lineHeight:1.5,color:C.amber,opacity:.7,marginTop:12,fontStyle:"italic",borderTop:`1px dashed ${C.line}`,paddingTop:10}}>
+                  Pre-engineering estimates for scoping only. Final structural design, anchor specification and wind-load verification must be stamped by a licensed structural engineer (IS 875 Part 3 for wind in India).
+                </p>
+              </Panel>
+            )}
+
+            {/* price card */}
+            <Panel>
+              <div style={{fontSize:10,letterSpacing:2,color:C.magenta,textTransform:"uppercase",fontWeight:700,marginBottom:10}}>Quotation</div>
+              <PriceTable r={result}/>
+            </Panel>
+          </div>
+
+          {/* METRICS */}
+          <div className="vr-sticky vr-scroll" style={{position:"sticky",top:80,maxHeight:"calc(100vh - 104px)",overflowY:"auto",paddingRight:4}}>
+            <Panel>
+              <h2 style={{fontFamily:FR,fontSize:19,margin:"0 0 2px"}}>Computed</h2>
+              <div style={{fontSize:11,color:C.lavender,opacity:.7,marginBottom:6}}>{result.product.series} · P{result.pitch}</div>
+              <Metric label="Built screen" value={`${num(result.builtWft,2)} × ${num(result.builtHft,2)}`} unit="ft" accent={C.amber} sub={`${num(result.builtWmm)} × ${num(result.builtHmm)} mm · snapped to whole cabinets`}/>
+              <Metric label="Cabinets (W × H)" value={`${result.cabCountW} × ${result.cabCountH}`} sub={`${result.totalCabs} cabinets · ${num(result.totalMods)} modules`}/>
+              <Metric label="Pixel resolution" value={`${num(result.pxW)} × ${num(result.pxH)}`} sub={`${num(result.totalPixels)} px · pitch ${result.pitch}mm`}/>
+              <Metric label="Active area" value={num(result.areaSqft,1)} unit="sqft" sub={`${result.ports} controller port(s)`}/>
+              {mode==="curved"&&cv&&(<>
+                <Metric label="Radius (R)" value={num(cv.R/1000,2)} unit="m" accent={C.amber} sub={`= ${num(cv.R,0)} mm`}/>
+                <Metric label={cv.curveType==="outer"?"Sagitta · cantilever":"Sagitta · depth"} value={num(cv.sag,0)} unit="mm" sub={`arc length ${num(cv.arcLen,0)} mm`}/>
+                <Metric label="Per-joint back gap" value={num(cv.gapPerJoint,1)} unit="mm" accent={verdictColor(cv.verdict)} sub={`wedge ${num(cv.cabAngleDeg,2)}° · ${cv.verdict}`}/>
+                <Metric label="Avg / Peak power" value={`${num(cv.avgPower/1000,1)} / ${num(cv.maxPower/1000,1)}`} unit="kW" sub={`recommended supply ${num(cv.recommendedSupply)} kW`}/>
+              </>)}
+              <Metric label="Grand Total" value={E.fmtINR(result.grandTotal)} accent={C.magenta} sub={`incl. GST · subtotal ${E.fmtINR(result.subtotal)}`}/>
+              <div style={{marginTop:14,padding:12,background:C.navy,borderRadius:8,fontSize:11,color:C.lavender,opacity:.7,fontFamily:MO,lineHeight:1.5}}>
+                {dbErr==="offline"?"⚠ Using built-in price fallback (open via a web server to read pixel-data.xml). ":""}
+                Export PDF generates a clean spec + quote sheet with drawings.
+              </div>
+            </Panel>
+          </div>
+
+        </div>
+        <div style={{textAlign:"center",padding:"22px 0 8px",borderTop:`1px solid ${C.line}`,marginTop:22}}>
+          <div style={{fontFamily:MO,fontSize:10,color:C.lavender,opacity:.5,letterSpacing:1.5}}>VISUAL RHYME · PIXEL QUOTE MAX · {new Date().getFullYear()}</div>
+        </div>
+      </div>
+
+      <PrintSheet r={result} meta={meta}/>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>

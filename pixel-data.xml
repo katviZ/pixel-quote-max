@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PIXEL QUOTE MAX — Product & Pricing Database
+  ============================================
+  This file is the SINGLE SOURCE OF TRUTH for all prices and product specs.
+  Edit values here and refresh the app — no code changes needed.
+
+  • rate   = INR per square foot of LED
+  • gst    = GST % for that pitch
+  • controllers / installTiers = priced in INR
+  • meta/curveSurchargePct = extra % added to LED cost for curved fabrication
+  • module W/H and cabinet W/H are in millimetres (mm)
+-->
+<pixelData>
+
+  <meta currency="INR"
+        curveSurchargePct="15"
+        pixelsPerPortMini="650000"
+        pixelsPerPortMicro="500000"
+        controllerGst="18"
+        installGst="18" />
+
+  <!-- Installation rate (INR/sqft) by total built area -->
+  <installTiers>
+    <tier maxArea="50"     rate="300" />
+    <tier maxArea="150"    rate="200" />
+    <tier maxArea="999999" rate="150" />
+  </installTiers>
+
+  <!-- Video controller price (INR) by required port count -->
+  <controllers type="mini">
+    <tier maxPorts="1"   price="15000" />
+    <tier maxPorts="2"   price="25000" />
+    <tier maxPorts="3"   price="45000" />
+    <tier maxPorts="5"   price="75000" />
+    <tier maxPorts="7"   price="125000" />
+    <tier maxPorts="999" price="150000" />
+  </controllers>
+  <controllers type="micro">
+    <tier maxPorts="3"   price="125000" />
+    <tier maxPorts="7"   price="150000" />
+    <tier maxPorts="12"  price="200000" />
+    <tier maxPorts="20"  price="250000" />
+    <tier maxPorts="999" price="350000" />
+  </controllers>
+
+  <!-- Product catalogue. moduleW/H and cabinet W/H in mm. -->
+  <products>
+
+    <product id="outdoor" series="Reyansh Outdoor" type="MiniLED" env="outdoor" moduleW="320" moduleH="160">
+      <cabinet w="960"  h="960"  label="960×960mm" />
+      <cabinet w="960"  h="1280" label="960×1280mm" />
+      <cabinet w="1280" h="1280" label="1280×1280mm" />
+      <pitch pp="6.67" rate="5000"  gst="18" sku="Reyansh Outdoor P6.67" />
+      <pitch pp="4"    rate="5500"  gst="18" sku="Reyansh Outdoor P4" />
+      <pitch pp="3"    rate="7250"  gst="18" sku="Reyansh Outdoor P3" />
+      <pitch pp="2.5"  rate="12500" gst="18" sku="Reyansh Outdoor P2.5" />
+    </product>
+
+    <product id="indoor" series="Reyansh Indoor" type="MiniLED" env="indoor" moduleW="320" moduleH="160">
+      <cabinet w="640" h="480" label="640×480mm" />
+      <pitch pp="2.5"  rate="7500"  gst="18" sku="Reyansh Indoor P2.5" />
+      <pitch pp="1.86" rate="10500" gst="18" sku="Reyansh Indoor P1.86" />
+      <pitch pp="1.56" rate="23000" gst="28" sku="Reyansh Indoor P1.56" />
+    </product>
+
+    <product id="microled" series="Leynna MicroLED" type="MicroLED" env="indoor" moduleW="300" moduleH="168.75">
+      <cabinet w="600"   h="337.5" label="600×337.5mm" />
+      <cabinet w="609.6" h="342.9" label="609.6×342.9mm" />
+      <pitch pp="1.56" rate="23000" gst="28" sku="Leynna Cosmo P1.56" />
+      <pitch pp="1.25" rate="25000" gst="28" sku="Leynna Cosmo P1.25" />
+      <pitch pp="1.17" rate="23500" gst="28" sku="Leynna Cosmo P1.17" />
+      <pitch pp="0.93" rate="35000" gst="28" sku="Leynna Sapphire P0.93" />
+      <pitch pp="0.78" rate="60000" gst="28" sku="Leynna Sapphire P0.78" />
+    </product>
+
+  </products>
+</pixelData>
