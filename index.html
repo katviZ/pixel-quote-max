@@ -419,6 +419,8 @@ function App(){
   const presets=[{key:"subtle",l:"Subtle",d:"R = 5× width"},{key:"signature",l:"Signature",d:"R = 2.5× width"},{key:"wrap",l:"Wrap",d:"R = 1.3× width"},{key:"cylinder",l:"Cylinder",d:"R = 0.8× width"}];
 
   return (
+    <>
+    {Q.get("forceprint")==="1" && <style>{".vr-screen{display:none!important}.vr-print{display:block!important}"}</style>}
     <div className="vr-screen" style={{minHeight:"100vh",background:C.navy}}>
       {/* top bar */}
       <div style={{position:"sticky",top:0,zIndex:50,background:C.navy+"E6",backdropFilter:"blur(10px)",borderBottom:`1px solid ${C.line}`}}>
@@ -586,8 +588,9 @@ function App(){
         </div>
       </div>
 
-      <PrintSheet r={result} meta={meta}/>
     </div>
+    <PrintSheet r={result} meta={meta}/>
+    </>
   );
 }
 
