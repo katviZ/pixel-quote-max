@@ -334,8 +334,9 @@ function PrintSheet({r,meta,preview}){
         All prices inclusive of GST as itemised. Transportation, fabrication & electrical work charged additional unless specified.
         {r.mode==="curved"&&<span style={{display:"block",marginTop:6,fontStyle:"italic",color:C.wall}}>Pre-engineering estimates for scoping only. Final structural design, anchor specification and wind-load verification must be stamped by a licensed structural engineer per local code (IS 875 Part 3 for wind in India).</span>}
       </div>
-      <div style={{marginTop:16,paddingTop:10,borderTop:"1px solid #E4DCCB",fontSize:9.5,color:muted,textAlign:"center",letterSpacing:.5}}>
-        VISUAL RHYME PVT. LTD. · 913, Avirat Silver Radiance 4, SG Hwy, Gota, Ahmedabad-382481 · visualrhyme.digital
+      <div style={{marginTop:16,paddingTop:10,borderTop:"1px solid #E4DCCB",fontSize:9.5,color:muted,textAlign:"center",letterSpacing:.5,lineHeight:1.6}}>
+        VISUAL RHYME PVT. LTD. · 913, Avirat Silver Radiance 4, SG Hwy, Gota, Ahmedabad-382481 · visualrhyme.digital<br/>
+        © {new Date().getFullYear()} Visual Rhyme Pvt. Ltd. · Kathan Mehta · All rights reserved. This is a tool and can contain errors — verify before ordering.
       </div>
     </div>
   );
@@ -458,25 +459,83 @@ function Assistant({ api }){
 const Q = (typeof location!=="undefined") ? new URLSearchParams(location.search) : new URLSearchParams();
 const qDef = (k,d)=> Q.get(k)!==null ? Q.get(k) : d;
 
+/* remembered session (last-used inputs) + policy acceptance */
+const POLICY_VERSION = "1";
+let SAVED = {};
+try { SAVED = JSON.parse(localStorage.getItem("pqm_session") || "{}"); } catch {}
+const sDef = (k,d)=> SAVED[k]!==undefined ? SAVED[k] : d;
+
+/* ───────── usage-policy gate (must accept to enter) ───────── */
+function Gate({ onAgree }){
+  const [checked,setChecked]=useState(false);
+  const bullet = { display:"flex", gap:8, marginBottom:8, fontSize:13, lineHeight:1.5, color:C.cream };
+  const dot = { color:C.magenta, fontWeight:700, flexShrink:0 };
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:1000,background:"rgba(6,0,26,.92)",backdropFilter:"blur(6px)",display:"flex",alignItems:"center",justifyContent:"center",padding:18,fontFamily:MN}}>
+      <div className="vr-scroll" style={{maxWidth:520,width:"100%",maxHeight:"92vh",overflowY:"auto",background:C.navyLight,border:`1px solid ${C.line}`,borderRadius:18,boxShadow:"0 24px 80px rgba(0,0,0,.6)",padding:"26px 26px 22px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
+          <VRLogo size={40}/>
+          <div>
+            <div style={{fontSize:10,letterSpacing:3,color:C.magenta,fontWeight:700,textTransform:"uppercase"}}>Visual Rhyme</div>
+            <div style={{fontFamily:FR,fontSize:24,fontWeight:600,lineHeight:1,marginTop:2}}>Pixel Quote <em style={{color:C.lavender}}>Max</em></div>
+          </div>
+        </div>
+
+        <div style={{background:`${C.amber}1A`,border:`1px solid ${C.amber}`,borderRadius:10,padding:"11px 13px",marginBottom:16,fontSize:13,lineHeight:1.5,color:C.cream}}>
+          ⚠ <strong>This is a tool — it can make mistakes.</strong> Just like an AI, it produces estimates that may contain errors. Always review and verify every quote, dimension and spec before sharing it or placing an order.
+        </div>
+
+        <div style={{fontSize:10,letterSpacing:2,color:C.magenta,textTransform:"uppercase",fontWeight:700,marginBottom:10}}>Usage Policy</div>
+        <div style={bullet}><span style={dot}>•</span><span>For estimation and scoping only. Prices are indicative and subject to confirmation by Visual Rhyme.</span></div>
+        <div style={bullet}><span style={dot}>•</span><span>Curved-screen structural, steel and power figures are pre-engineering estimates and must be verified by a licensed structural engineer (IS 875 Pt 3 for wind in India) before fabrication.</span></div>
+        <div style={bullet}><span style={dot}>•</span><span>Your inputs are stored locally in this browser to restore your session. If you request a callback, the name and phone you provide are sent to Visual Rhyme.</span></div>
+        <div style={bullet}><span style={dot}>•</span><span>The tool, its calculations and outputs are the property of Visual Rhyme Pvt. Ltd. and may not be redistributed without permission.</span></div>
+
+        <label style={{display:"flex",gap:9,alignItems:"flex-start",margin:"16px 0 14px",cursor:"pointer",fontSize:13,color:C.lavender}}>
+          <input type="checkbox" checked={checked} onChange={e=>setChecked(e.target.checked)} style={{marginTop:2,accentColor:C.magenta,width:16,height:16,flexShrink:0}}/>
+          <span>I understand this tool can make errors and I agree to the usage policy above.</span>
+        </label>
+
+        <button onClick={onAgree} disabled={!checked}
+          style={{width:"100%",padding:"13px",borderRadius:12,border:"none",fontWeight:700,fontSize:14,letterSpacing:.6,textTransform:"uppercase",cursor:checked?"pointer":"not-allowed",color:C.cream,background:checked?`linear-gradient(135deg, ${C.purple}, ${C.magenta})`:C.line,opacity:checked?1:.6,transition:"opacity .2s"}}>
+          I Agree — Enter
+        </button>
+
+        <div style={{textAlign:"center",marginTop:14,fontSize:10.5,color:C.lavender,opacity:.6,lineHeight:1.5}}>
+          © {new Date().getFullYear()} Visual Rhyme Pvt. Ltd. · Kathan Mehta · All rights reserved.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App(){
   const [db,setDb]=useState(null);
   const [dbErr,setDbErr]=useState("");
-  const [mode,setMode]=useState(qDef("mode","flat")==="curved"?"curved":"flat");
-  const [productId,setProductId]=useState(qDef("product","outdoor"));
-  const [pitch,setPitch]=useState(4);
-  const [cabIndex,setCabIndex]=useState(0);
-  const [widthFt,setWidthFt]=useState(parseFloat(qDef("w","12"))||12);
-  const [heightFt,setHeightFt]=useState(parseFloat(qDef("h","8"))||8);
-  const [curveMode,setCurveMode]=useState("preset");
-  const [preset,setPreset]=useState("signature");
-  const [sagittaMm,setSagittaMm]=useState(457);
-  const [radiusMm,setRadiusMm]=useState(8000);
-  const [curveType,setCurveType]=useState("outer");
-  const [cabWeightKg,setCabWeightKg]=useState(14);
+  const [agreed,setAgreed]=useState(()=>{ try{ return localStorage.getItem("pqm_agreed")===POLICY_VERSION; }catch{ return false; } });
+  const [mode,setMode]=useState(qDef("mode",sDef("mode","flat"))==="curved"?"curved":"flat");
+  const [productId,setProductId]=useState(qDef("product",sDef("product","outdoor")));
+  const [pitch,setPitch]=useState(sDef("pitch",4));
+  const [cabIndex,setCabIndex]=useState(sDef("cabIndex",0));
+  const [widthFt,setWidthFt]=useState(parseFloat(qDef("w",sDef("widthFt",12)))||12);
+  const [heightFt,setHeightFt]=useState(parseFloat(qDef("h",sDef("heightFt",8)))||8);
+  const [curveMode,setCurveMode]=useState(sDef("curveMode","preset"));
+  const [preset,setPreset]=useState(sDef("preset","signature"));
+  const [sagittaMm,setSagittaMm]=useState(sDef("sagittaMm",457));
+  const [radiusMm,setRadiusMm]=useState(sDef("radiusMm",8000));
+  const [curveType,setCurveType]=useState(sDef("curveType","outer"));
+  const [cabWeightKg,setCabWeightKg]=useState(sDef("cabWeightKg",14));
   const [stageTab,setStageTab]=useState("elevation");
-  const [project,setProject]=useState("");
-  const [client,setClient]=useState("");
+  const [project,setProject]=useState(sDef("project",""));
+  const [client,setClient]=useState(sDef("client",""));
   const [exportFlash,setExportFlash]=useState(false);
+
+  // remember last-used inputs to restore on return
+  useEffect(()=>{
+    try{ localStorage.setItem("pqm_session", JSON.stringify({ mode,product:productId,pitch,cabIndex,widthFt,heightFt,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg,project,client })); }catch{}
+  },[mode,productId,pitch,cabIndex,widthFt,heightFt,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg,project,client]);
+
+  const acceptPolicy = ()=>{ try{ localStorage.setItem("pqm_agreed",POLICY_VERSION); }catch{} setAgreed(true); };
 
   // load XML db (served) with offline fallback
   useEffect(()=>{
@@ -513,6 +572,9 @@ function App(){
   },[db,product,mode,productId,pitch,widthFt,heightFt,cabIndex,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg]);
 
   const meta = useMemo(()=>({project,client,ref:E.quoteRef(),date:new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})}),[project,client,result]);
+
+  // usage-policy gate — must accept to enter (QC/print contexts bypass)
+  if(!agreed && Q.get("forceprint")!=="1" && Q.get("sheet")!=="1") return <Gate onAgree={acceptPolicy}/>;
 
   if(!db) return <div style={{padding:40,fontFamily:MN,color:C.lavender}}>{dbErr&&dbErr!=="offline"?("⚠ "+dbErr):"Loading product database…"}</div>;
   if(!result) return <div style={{padding:40,color:C.red}}>Enter a valid size to compute.</div>;
@@ -704,7 +766,8 @@ function App(){
 
         </div>
         <div style={{textAlign:"center",padding:"22px 0 8px",borderTop:`1px solid ${C.line}`,marginTop:22}}>
-          <div style={{fontFamily:MO,fontSize:10,color:C.lavender,opacity:.5,letterSpacing:1.5}}>VISUAL RHYME · PIXEL QUOTE MAX · {new Date().getFullYear()}</div>
+          <div style={{fontSize:10.5,color:C.lavender,opacity:.55,marginBottom:5}}>⚠ This is a tool — it can make mistakes. Verify every quote before sharing or ordering.</div>
+          <div style={{fontFamily:MO,fontSize:10,color:C.lavender,opacity:.5,letterSpacing:1.2}}>© {new Date().getFullYear()} Visual Rhyme Pvt. Ltd. · Kathan Mehta · All rights reserved.</div>
         </div>
       </div>
 
