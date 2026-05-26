@@ -544,6 +544,58 @@ function HistoryPanel({ history, onOpen, onDelete, onClose }){
   );
 }
 
+/* ───────── comparison panel (up to 3 configs side by side) ───────── */
+function ComparePanel({ items, db, onLoad, onRemove, onClear, onClose }){
+  const rows = items.map((cfg)=>{ let r=null; try{ r=E.computeQuote({...cfg,widthFt:Number(cfg.widthFt)||0,heightFt:Number(cfg.heightFt)||0},db); }catch{} return { cfg, r }; });
+  const valid = rows.filter(x=>x.r);
+  const cheapest = valid.length>1 ? Math.min(...valid.map(x=>x.r.grandTotal)) : null;
+  const Line = ({k,v,accent,strong})=>(
+    <div style={{display:"flex",justifyContent:"space-between",gap:8,padding:"5px 0",borderBottom:`1px solid ${C.line}`,fontSize:12}}>
+      <span style={{color:C.lavender,opacity:.7}}>{k}</span>
+      <span style={{fontFamily:MO,fontWeight:strong?700:600,color:accent||C.cream,textAlign:"right"}}>{v}</span>
+    </div>
+  );
+  return (
+    <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:300,background:"rgba(6,0,26,.8)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",padding:18,fontFamily:MN}}>
+      <div onClick={e=>e.stopPropagation()} className="vr-scroll" style={{maxWidth:980,width:"100%",maxHeight:"92vh",overflow:"auto",background:C.navyLight,border:`1px solid ${C.line}`,borderRadius:18,boxShadow:"0 24px 80px rgba(0,0,0,.6)",padding:22}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
+          <h2 style={{fontFamily:FR,fontSize:22,margin:0}}>Compare Configurations</h2>
+          <button onClick={onClose} style={{background:"transparent",border:"none",color:C.cream,fontSize:24,cursor:"pointer",lineHeight:1}}>×</button>
+        </div>
+        <div style={{fontSize:11,color:C.lavender,opacity:.7,marginBottom:16}}>Up to 3 side by side. Lowest grand total is flagged. Add more with “＋ Add to comparison”.</div>
+        {items.length===0 && <div style={{color:C.lavender,opacity:.6,fontSize:13,padding:"30px 0",textAlign:"center"}}>Nothing to compare yet.<br/>Configure a quote and hit “＋ Add to comparison”.</div>}
+        <div style={{display:"flex",gap:14,alignItems:"stretch"}}>
+          {rows.map(({cfg,r},i)=>(
+            <div key={i} style={{flex:"1 1 0",minWidth:210,background:C.navy,border:`1px solid ${(cheapest!==null&&r&&r.grandTotal===cheapest)?C.green:C.line}`,borderRadius:12,padding:14,position:"relative"}}>
+              {(cheapest!==null&&r&&r.grandTotal===cheapest)&&<div style={{position:"absolute",top:-9,left:14,background:C.green,color:C.navy,fontSize:9,fontWeight:800,padding:"2px 8px",borderRadius:999,letterSpacing:1,textTransform:"uppercase"}}>Best value</div>}
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                <span style={{fontSize:9,fontWeight:800,letterSpacing:1,textTransform:"uppercase",color:cfg.mode==="curved"?C.amber:C.lavender}}>{cfg.mode}</span>
+                <button onClick={()=>onRemove(i)} title="Remove" style={{background:"transparent",border:"none",color:C.lavender,opacity:.6,fontSize:16,cursor:"pointer",lineHeight:1}}>×</button>
+              </div>
+              {r ? (<>
+                <div style={{fontFamily:FR,fontSize:22,color:C.magenta,marginBottom:8}}>{E.fmtINR(r.grandTotal)}</div>
+                <Line k="Product" v={r.product.series.split(" ").slice(-1)[0]}/>
+                <Line k="Pitch" v={"P"+r.pitch}/>
+                <Line k="Built" v={`${r.builtWft.toFixed(1)}×${r.builtHft.toFixed(1)}ft`}/>
+                <Line k="Area" v={`${r.areaSqft.toFixed(0)} sqft`}/>
+                <Line k="Resolution" v={`${r.pxW}×${r.pxH}`}/>
+                <Line k="Cabinets" v={`${r.totalCabs}`}/>
+                <Line k="Ports" v={`${r.ports}`}/>
+                {r.curve && <Line k="Curve" v={r.curve.verdict} accent={verdictColor(r.curve.verdict)}/>}
+                <Line k="Subtotal" v={E.fmtINR(r.subtotal)}/>
+                <Line k="GST" v={E.fmtINR(r.totalGst)}/>
+                <Line k="Grand Total" v={E.fmtINR(r.grandTotal)} accent={C.magenta} strong/>
+                <button onClick={()=>onLoad(cfg)} style={{width:"100%",marginTop:12,background:`linear-gradient(135deg, ${C.purple}, ${C.magenta})`,border:"none",color:C.cream,borderRadius:8,padding:"8px 0",fontWeight:700,fontSize:12,cursor:"pointer"}}>Load &amp; edit</button>
+              </>) : <div style={{color:C.red,fontSize:12,padding:"20px 0"}}>Invalid config</div>}
+            </div>
+          ))}
+        </div>
+        {items.length>0 && <button onClick={onClear} style={{marginTop:16,background:"transparent",border:`1px solid ${C.line}`,color:C.lavender,borderRadius:8,padding:"7px 14px",fontSize:12,cursor:"pointer"}}>Clear all</button>}
+      </div>
+    </div>
+  );
+}
+
 function App(){
   const [db,setDb]=useState(null);
   const [dbErr,setDbErr]=useState("");
@@ -566,6 +618,8 @@ function App(){
   const [exportFlash,setExportFlash]=useState(false);
   const [historyOpen,setHistoryOpen]=useState(false);
   const [history,setHistory]=useState(()=>{ try{ return JSON.parse(localStorage.getItem("pqm_history")||"[]"); }catch{ return []; } });
+  const [compareSet,setCompareSet]=useState(()=>{ try{ return JSON.parse(localStorage.getItem("pqm_compare")||"[]"); }catch{ return []; } });
+  const [compareOpen,setCompareOpen]=useState(false);
 
   // remember last-used inputs to restore on return
   useEffect(()=>{
@@ -655,6 +709,11 @@ function App(){
   };
   const deleteQuote = (ref)=> saveHistory(history.filter(h=>h.ref!==ref));
 
+  // ----- comparison set -----
+  const saveCompare = (arr)=>{ setCompareSet(arr); try{ localStorage.setItem("pqm_compare",JSON.stringify(arr)); }catch{} };
+  const addToCompare = ()=>{ saveCompare([...compareSet,{ mode,productId,pitch,cabIndex,widthFt,heightFt,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg,project,client }].slice(-3)); setCompareOpen(true); };
+  const removeCompare = (i)=> saveCompare(compareSet.filter((_,j)=>j!==i));
+
   return (
     <>
     {Q.get("forceprint")==="1" && <style>{".vr-screen{display:none!important}.vr-print{display:block!important}"}</style>}
@@ -677,6 +736,7 @@ function App(){
             style={{background:C.navyLight,border:`1px solid ${C.line}`,color:C.cream,padding:"9px 12px",fontFamily:MN,fontSize:13,borderRadius:8,outline:"none",width:160}}/>
           <input value={client} onChange={e=>setClient(e.target.value)} placeholder="Client (optional)"
             style={{background:C.navyLight,border:`1px solid ${C.line}`,color:C.cream,padding:"9px 12px",fontFamily:MN,fontSize:13,borderRadius:8,outline:"none",width:150}}/>
+          {compareSet.length>0 && <button onClick={()=>setCompareOpen(true)} style={headerBtn(false)}>⊞ Compare ({compareSet.length})</button>}
           <button onClick={()=>setHistoryOpen(true)} style={headerBtn(false)}>🕘 History{history.length?` (${history.length})`:""}</button>
           <button onClick={()=>{recordQuote();window.print();}} disabled={!valid} style={{...headerBtn(false),background:C.purple,borderColor:exportFlash?C.amber:C.purple,color:C.cream,opacity:valid?1:.5,boxShadow:exportFlash?`0 0 0 3px ${C.amber}, 0 0 22px ${C.amber}`:"none",transition:"box-shadow .3s, border-color .3s"}}>⤓ Export PDF</button>
         </div>
@@ -792,7 +852,10 @@ function App(){
 
             {/* price card */}
             <Panel>
-              <div style={{fontSize:10,letterSpacing:2,color:C.magenta,textTransform:"uppercase",fontWeight:700,marginBottom:10}}>Quotation</div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                <span style={{fontSize:10,letterSpacing:2,color:C.magenta,textTransform:"uppercase",fontWeight:700}}>Quotation</span>
+                <button onClick={addToCompare} style={{background:"transparent",border:`1px solid ${C.magenta}`,color:C.lavender,borderRadius:999,padding:"5px 12px",fontSize:11,fontWeight:600,cursor:"pointer"}}>＋ Add to comparison</button>
+              </div>
               <PriceTable r={result}/>
             </Panel>
           </div>
@@ -829,6 +892,7 @@ function App(){
 
       <Assistant api={assistantApi}/>
       {historyOpen && <HistoryPanel history={history} onOpen={openQuote} onDelete={deleteQuote} onClose={()=>setHistoryOpen(false)}/>}
+      {compareOpen && <ComparePanel items={compareSet} db={db} onLoad={(cfg)=>{openQuote(cfg);setCompareOpen(false);}} onRemove={removeCompare} onClear={()=>saveCompare([])} onClose={()=>setCompareOpen(false)}/>}
     </div>
     <PrintSheet r={result} meta={meta}/>
     </>
