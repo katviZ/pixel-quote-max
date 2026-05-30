@@ -128,7 +128,7 @@ function Metric({label,value,unit,accent,sub}){
 function PlanDrawing({chord,R,sag,cabCountW,curveType}){
   const W=560,H=320,pad=50, scale=(W-2*pad)/chord, cx=W/2;
   const isOuter=curveType==="outer";
-  const wallY=isOuter?H-pad-30:pad+30, viewerY=isOuter?22:H-14, apexDir=isOuter?-1:1, half=chord/2;
+  const wallY=isOuter?H-pad-30:pad+30, viewerY=isOuter?44:H-14, apexDir=isOuter?-1:1, half=chord/2;
   const x1=cx-half*scale, x2=cx+half*scale, Rpx=R*scale, sweep=isOuter?1:0;
   const arcPath=`M ${x1} ${wallY} A ${Rpx} ${Rpx} 0 0 ${sweep} ${x2} ${wallY}`;
   const arcPoint=(t)=>{const xc=-half+t*chord;const yo=Math.sqrt(Math.max(0,R*R-xc*xc))-(R-sag);return{x:cx+xc*scale,y:wallY+apexDir*yo*scale};};
@@ -140,7 +140,7 @@ function PlanDrawing({chord,R,sag,cabCountW,curveType}){
       <defs><pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke={C.line} strokeWidth="0.5" opacity="0.4"/></pattern>
       <pattern id="wh" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke={C.wall} strokeWidth="1.5"/></pattern></defs>
       <rect width={W} height={H} fill={C.navyLight}/><rect width={W} height={H} fill="url(#grid)"/>
-      <text x={pad} y={24} fontSize="10" fill={C.lavender} opacity="0.7" fontWeight="600" letterSpacing="2">PLAN VIEW · {isOuter?"OUTER (CONVEX)":"INNER (CONCAVE)"}</text>
+      <text x={pad} y={18} fontSize="10" fill={C.lavender} opacity="0.7" fontWeight="600" letterSpacing="2">PLAN VIEW · {isOuter?"OUTER (CONVEX)":"INNER (CONCAVE)"}</text>
       <rect x={x1-30} y={isOuter?wallY:wallY-14} width={chord*scale+60} height={14} fill="url(#wh)" opacity="0.7"/>
       <line x1={x1-30} y1={wallY} x2={x2+30} y2={wallY} stroke={C.wall} strokeWidth="2"/>
       <text x={cx} y={isOuter?wallY+28:wallY-20} textAnchor="middle" fontSize="10" fill={C.wall} fontWeight="700" letterSpacing="1.5">BUILDING WALL</text>
@@ -152,8 +152,8 @@ function PlanDrawing({chord,R,sag,cabCountW,curveType}){
       {ticks.map((p,i)=>(<circle key={i} cx={p.x} cy={p.y} r="2.5" fill={C.cream}/>))}
       <line x1={apex.x-22} y1={apex.y} x2={apex.x-22} y2={wallY} stroke={C.green} strokeWidth="1.2"/>
       <text x={apex.x-30} y={(apex.y+wallY)/2+4} textAnchor="end" fontSize="10" fill={C.green} fontFamily={MO} fontWeight="600">S={num(sag,0)}</text>
-      <text x={apex.x+8} y={apex.y+(isOuter?-10:16)} fontSize="10" fill={C.amber} fontFamily={MO} fontWeight="600">R={num(R/1000,2)}m</text>
-      <text x={cx} y={isOuter?Math.min(arcPoint(0).y,apex.y)-16:Math.max(arcPoint(0).y,apex.y)+22} textAnchor="middle" fontSize="11" fill={C.magenta} fontWeight="700">LED SCREEN · {Math.round(cabCountW)} CABINETS WIDE</text>
+      <text x={W-pad+22} y={apex.y+4} textAnchor="end" fontSize="10" fill={C.amber} fontFamily={MO} fontWeight="600">R={num(R/1000,2)}m</text>
+      <text x={cx} y={isOuter?64:Math.max(arcPoint(0).y,apex.y)+24} textAnchor="middle" fontSize="11" fill={C.magenta} fontWeight="700">LED SCREEN · {Math.round(cabCountW)} CABINETS WIDE</text>
     </svg>
   );
 }
@@ -602,24 +602,25 @@ function App(){
   const [agreed,setAgreed]=useState(()=>{ try{ return localStorage.getItem("pqm_agreed")===POLICY_VERSION; }catch{ return false; } });
   const [mode,setMode]=useState(qDef("mode",sDef("mode","flat"))==="curved"?"curved":"flat");
   const [productId,setProductId]=useState(qDef("product",sDef("product","outdoor")));
-  const [pitch,setPitch]=useState(sDef("pitch",4));
-  const [cabIndex,setCabIndex]=useState(sDef("cabIndex",0));
+  const [pitch,setPitch]=useState(parseFloat(qDef("p",sDef("pitch",4)))||4);
+  const [cabIndex,setCabIndex]=useState(parseInt(qDef("cab",sDef("cabIndex",0)))||0);
   const [widthFt,setWidthFt]=useState(parseFloat(qDef("w",sDef("widthFt",12)))||12);
   const [heightFt,setHeightFt]=useState(parseFloat(qDef("h",sDef("heightFt",8)))||8);
-  const [curveMode,setCurveMode]=useState(sDef("curveMode","preset"));
-  const [preset,setPreset]=useState(sDef("preset","signature"));
-  const [sagittaMm,setSagittaMm]=useState(sDef("sagittaMm",457));
-  const [radiusMm,setRadiusMm]=useState(sDef("radiusMm",8000));
-  const [curveType,setCurveType]=useState(sDef("curveType","outer"));
-  const [cabWeightKg,setCabWeightKg]=useState(sDef("cabWeightKg",14));
+  const [curveMode,setCurveMode]=useState(qDef("cm",sDef("curveMode","preset")));
+  const [preset,setPreset]=useState(qDef("pr",sDef("preset","signature")));
+  const [sagittaMm,setSagittaMm]=useState(parseFloat(qDef("sag",sDef("sagittaMm",457)))||457);
+  const [radiusMm,setRadiusMm]=useState(parseFloat(qDef("rad",sDef("radiusMm",8000)))||8000);
+  const [curveType,setCurveType]=useState(qDef("ct",sDef("curveType","outer")));
+  const [cabWeightKg,setCabWeightKg]=useState(parseFloat(qDef("cw",sDef("cabWeightKg",14)))||14);
   const [stageTab,setStageTab]=useState("elevation");
-  const [project,setProject]=useState(sDef("project",""));
-  const [client,setClient]=useState(sDef("client",""));
+  const [project,setProject]=useState(qDef("proj",sDef("project","")));
+  const [client,setClient]=useState(qDef("cl",sDef("client","")));
   const [exportFlash,setExportFlash]=useState(false);
   const [historyOpen,setHistoryOpen]=useState(false);
   const [history,setHistory]=useState(()=>{ try{ return JSON.parse(localStorage.getItem("pqm_history")||"[]"); }catch{ return []; } });
   const [compareSet,setCompareSet]=useState(()=>{ try{ return JSON.parse(localStorage.getItem("pqm_compare")||"[]"); }catch{ return []; } });
   const [compareOpen,setCompareOpen]=useState(false);
+  const [linkCopied,setLinkCopied]=useState(false);
 
   // remember last-used inputs to restore on return
   useEffect(()=>{
@@ -713,6 +714,35 @@ function App(){
   const saveCompare = (arr)=>{ setCompareSet(arr); try{ localStorage.setItem("pqm_compare",JSON.stringify(arr)); }catch{} };
   const addToCompare = ()=>{ saveCompare([...compareSet,{ mode,productId,pitch,cabIndex,widthFt,heightFt,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg,project,client }].slice(-3)); setCompareOpen(true); };
   const removeCompare = (i)=> saveCompare(compareSet.filter((_,j)=>j!==i));
+
+  // ----- share helpers -----
+  const buildShareLink = ()=>{
+    const p = new URLSearchParams({
+      mode, product:productId, w:widthFt, h:heightFt, p:pitch, cab:cabIndex,
+      cm:curveMode, pr:preset, sag:sagittaMm, rad:radiusMm, ct:curveType, cw:cabWeightKg,
+    });
+    if(project) p.set("proj",project);
+    if(client)  p.set("cl",client);
+    return location.origin + location.pathname + "?" + p.toString();
+  };
+  const copyLink = ()=>{
+    const url = buildShareLink();
+    const done = ()=>{ setLinkCopied(true); setTimeout(()=>setLinkCopied(false),1800); };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(url).then(done).catch(()=>window.prompt("Copy this link:",url));
+    } else { window.prompt("Copy this link:", url); }
+  };
+  const shareWhatsApp = ()=>{
+    const r = result, link = buildShareLink();
+    const txt = `*Pixel Quote Max — ${meta.ref}*%0A${meta.date}` +
+      `%0A${mode==="curved"?"Curved":"Flat"} · ${r.product.series} · P${r.pitch}` +
+      `%0ASize: ${r.builtWft.toFixed(2)}×${r.builtHft.toFixed(2)} ft (${r.areaSqft.toFixed(0)} sqft)` +
+      `%0AResolution: ${r.pxW}×${r.pxH}px` +
+      `%0A*Grand Total: ${E.fmtINR(r.grandTotal).replace("₹","Rs.")}* (incl. GST)` +
+      `%0A%0AConfigure / share: ${encodeURIComponent(link)}` +
+      `%0A%0A— Visual Rhyme Pvt. Ltd.`;
+    window.open("https://wa.me/?text="+txt,"_blank");
+  };
 
   return (
     <>
@@ -852,9 +882,13 @@ function App(){
 
             {/* price card */}
             <Panel>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:8}}>
                 <span style={{fontSize:10,letterSpacing:2,color:C.magenta,textTransform:"uppercase",fontWeight:700}}>Quotation</span>
-                <button onClick={addToCompare} style={{background:"transparent",border:`1px solid ${C.magenta}`,color:C.lavender,borderRadius:999,padding:"5px 12px",fontSize:11,fontWeight:600,cursor:"pointer"}}>＋ Add to comparison</button>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  <button onClick={copyLink} style={{background:"transparent",border:`1px solid ${linkCopied?C.green:C.line}`,color:linkCopied?C.green:C.lavender,borderRadius:999,padding:"5px 12px",fontSize:11,fontWeight:600,cursor:"pointer",transition:"all .2s"}}>{linkCopied?"✓ Copied":"🔗 Copy link"}</button>
+                  <button onClick={shareWhatsApp} style={{background:"transparent",border:`1px solid #25D366`,color:"#25D366",borderRadius:999,padding:"5px 12px",fontSize:11,fontWeight:600,cursor:"pointer"}}>💬 WhatsApp</button>
+                  <button onClick={addToCompare} style={{background:"transparent",border:`1px solid ${C.magenta}`,color:C.lavender,borderRadius:999,padding:"5px 12px",fontSize:11,fontWeight:600,cursor:"pointer"}}>＋ Compare</button>
+                </div>
               </div>
               <PriceTable r={result}/>
             </Panel>
