@@ -140,7 +140,7 @@ function PlanDrawing({chord,R,sag,cabCountW,curveType}){
       <defs><pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke={C.line} strokeWidth="0.5" opacity="0.4"/></pattern>
       <pattern id="wh" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke={C.wall} strokeWidth="1.5"/></pattern></defs>
       <rect width={W} height={H} fill={C.navyLight}/><rect width={W} height={H} fill="url(#grid)"/>
-      <text x={pad} y={18} fontSize="10" fill={C.lavender} opacity="0.7" fontWeight="600" letterSpacing="2">PLAN VIEW · {isOuter?"OUTER (CONVEX)":"INNER (CONCAVE)"}</text>
+      <text x={pad} y={18} fontSize="10" fill={C.lavender} opacity="0.7" fontWeight="600" letterSpacing="2">PLAN · {isOuter?"OUTER":"INNER"}</text>
       <rect x={x1-30} y={isOuter?wallY:wallY-14} width={chord*scale+60} height={14} fill="url(#wh)" opacity="0.7"/>
       <line x1={x1-30} y1={wallY} x2={x2+30} y2={wallY} stroke={C.wall} strokeWidth="2"/>
       <text x={cx} y={isOuter?wallY+28:wallY-20} textAnchor="middle" fontSize="10" fill={C.wall} fontWeight="700" letterSpacing="1.5">BUILDING WALL</text>
