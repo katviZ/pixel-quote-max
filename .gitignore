@@ -1,0 +1,26 @@
+# Verification artifacts
+v-*.png
+v-*.pdf
+qc-*.png
+qc-*.pdf
+qc-*.html
+_*.png
+_*.html
+qc*.mjs
+snap.mjs
+pdf.mjs
+shot.mjs
+embed.mjs
+make_xlsx.py
+
+# Stray work from other projects — never let these land here again
+build-6side.mjs
+kunal-panther-*
+6-Phase-Room-*
+*-Panther-*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+~$*.xlsx
+~$*.docx
