@@ -140,6 +140,21 @@ const a = PQM.computeQuote({ mode:"flat", productId:"outdoor", pitch:4, widthFt:
 const b = PQM.computeQuote({ mode:"flat", productId:"outdoor", pitch:4, widthFt:12, heightFt:8, cabIndex:2, orientation:"rotated" }, db);
 ok("non-square cab rotation changes built size", a.builtWmm !== b.builtWmm || a.builtHmm !== b.builtHmm);
 
+console.log("\n── 8 · Tech / power / weight derivatives ──");
+const tflat = PQM.computeQuote({ mode:"flat", productId:"outdoor", pitch:4, widthFt:12, heightFt:8, cabIndex:1 }, db);
+ok("diagonal > 0", tflat.diagInches > 0, "got "+tflat.diagInches);
+ok("aspect ratio is X:Y", /^\d+:\d+$/.test(tflat.aspectRatio), "got "+tflat.aspectRatio);
+ok("pixel density per sqm = 62,500 for P4", tflat.pixelDensitySqm === 62500, "got "+tflat.pixelDensitySqm);
+ok("min viewing distance = 4m for outdoor P4 (vdMul 1.0)", tflat.minViewingDistanceM === 4, "got "+tflat.minViewingDistanceM);
+ok("screen weight uses cab.weight (14kg × 12 cabs = 168)", tflat.screenWeightKg === 168, "got "+tflat.screenWeightKg);
+ok("avg power for flat > 0 (Outdoor 500 W/sqm)", tflat.avgPowerW > 0);
+ok("max power > avg power", tflat.maxPowerW > tflat.avgPowerW);
+ok("recommended supply >= 1 kW", tflat.recommendedSupplyKw >= 1);
+ok("tech.brightnessNits = 5500", tflat.tech.brightnessNits === 5500);
+ok("tech.refreshHz = 3840", tflat.tech.refreshHz === 3840);
+ok("tech.ipRating = IP65", tflat.tech.ipRating === "IP65");
+console.log("     → outdoor P4 12x8: diag "+tflat.diagInches.toFixed(1)+"\", "+tflat.aspectRatio+", "+tflat.pixelDensitySqm+" px/sqm, "+tflat.screenWeightKg+"kg, "+tflat.recommendedSupplyKw+"kW supply");
+
 console.log("\n────────────────────────────");
 console.log(`  RESULT: ${pass} passed, ${fail} failed`);
 console.log("────────────────────────────\n");

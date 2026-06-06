@@ -44,9 +44,9 @@
     });
 
     xml.replace(/<product\b([^>]*)>([\s\S]*?)<\/product>/g, (full, head, body) => {
-      const p = numKeys(attrs("<x " + head + ">"), ["moduleW", "moduleH"]);
+      const p = numKeys(attrs("<x " + head + ">"), ["moduleW","moduleH","brightnessNits","refreshHz","bitDepth","viewingAngleDeg","contrastStatic","contrastDynamic","colorGamutSrgbPct","colorGamutRec2020Pct","maxPowerSqm","avgPowerSqm","warrantyYears","cabinetDepthMm","moduleDepthMm","lifespanHours","opTempMin","opTempMax","vdMultiplier"]);
       p.cabinets = []; p.pitches = [];
-      body.replace(/<cabinet\b[^>]*\/>/g, (t) => { p.cabinets.push(numKeys(attrs(t), ["w", "h"])); return t; });
+      body.replace(/<cabinet\b[^>]*\/>/g, (t) => { p.cabinets.push(numKeys(attrs(t), ["w","h","weight"])); return t; });
       body.replace(/<pitch\b[^>]*\/>/g, (t) => { p.pitches.push(numKeys(attrs(t), ["pp", "rate", "gst"])); return t; });
       db.products.push(p);
       return full;
@@ -167,8 +167,28 @@
     const totalPixels = pxW * pxH;
 
     const areaSqft = (builtWmm * builtHmm) / (MM_PER_FT * MM_PER_FT);
+    const areaSqm = (builtWmm * builtHmm) / 1e6;
     const ppp = micro ? db.meta.pixelsPerPortMicro : db.meta.pixelsPerPortMini;
     const ports = Math.max(1, Math.ceil(totalPixels / ppp));
+
+    // ---- tech / engineering derivatives (shared, used by PDF + screen) ----
+    const diagInches = Math.sqrt(builtWmm*builtWmm + builtHmm*builtHmm) / 25.4;
+    const gcd = (a,b)=> b===0 ? a : gcd(b, a%b);
+    const g = gcd(pxW || 1, pxH || 1);
+    const aspectRatio = `${Math.round((pxW||1)/g)}:${Math.round((pxH||1)/g)}`;
+    const pixelDensitySqm = pitch > 0 ? Math.round(1e6 / (pitch * pitch)) : 0;
+    const vdMul = product.vdMultiplier != null ? product.vdMultiplier : 1.0;
+    const minViewingDistanceM = +(pitch * vdMul).toFixed(2);
+
+    // cabinet weight: explicit param > cab attr > sensible default
+    const perCabWeightKg = (params.cabWeightKg != null && params.cabWeightKg !== "" && !isNaN(+params.cabWeightKg))
+      ? +params.cabWeightKg : (cab.weight != null ? cab.weight : (micro ? 5 : 14));
+    const screenWeightKg = Math.round(totalCabs * perCabWeightKg);
+
+    // electrical (for BOTH flat & curved now)
+    const avgPowerW = Math.round(areaSqm * (product.avgPowerSqm || 0));
+    const maxPowerW = Math.round(areaSqm * (product.maxPowerSqm || 0));
+    const recommendedSupplyKw = Math.max(1, Math.ceil((maxPowerW * 1.25) / 1000));
 
     // ---- pricing (shared) ----
     const pr = priceForPitch(product, pitch);
@@ -206,11 +226,7 @@
       const surchargeGst = round((surcharge * pr.gst) / 100);
       lines.push({ item: "Curve Fabrication", rate: surPct, rateUnit: "%", qty: "curve work", amount: surcharge, gstPct: pr.gst, gst: surchargeGst });
 
-      // structure + electrical (ported from original engine)
-      const totalWeight = totalCabs * (params.cabWeightKg || 14);
-      const avgPower = totalCabs * (modPerCab * 25);
-      const maxPower = totalCabs * (modPerCab * 70);
-      const recommendedSupply = Math.ceil((maxPower * 1.25) / 1000);
+      // structure (steel + curve mounting)
       const vertPosts = Math.ceil(builtWmm / 960) + 1;
       const vertPostLen = (builtHmm + 600) / 1000;
       const horizRails = Math.ceil(builtHmm / 960) + 1;
@@ -220,7 +236,9 @@
 
       curve = {
         chordMm, R, sag, surPct, surcharge, surchargeGst,
-        totalWeight, avgPower, maxPower, recommendedSupply, steelWeightKg,
+        // legacy keys kept for compatibility with existing PrintSheet code
+        totalWeight: screenWeightKg, avgPower: avgPowerW, maxPower: maxPowerW,
+        recommendedSupply: recommendedSupplyKw, steelWeightKg,
         vertPosts, horizRails, ...m,
         curveType: params.curveType || "outer",
       };
@@ -230,6 +248,19 @@
     const totalGst = lines.reduce((s, l) => s + l.gst, 0);
     const grandTotal = subtotal + totalGst;
 
+    const tech = {
+      displayTech: product.displayTech || null, ledType: product.ledType || null,
+      brightnessNits: product.brightnessNits || null, refreshHz: product.refreshHz || null,
+      bitDepth: product.bitDepth || null, viewingAngleDeg: product.viewingAngleDeg || null,
+      contrastStatic: product.contrastStatic || null, contrastDynamic: product.contrastDynamic || null,
+      colorGamutSrgbPct: product.colorGamutSrgbPct || null, colorGamutRec2020Pct: product.colorGamutRec2020Pct || null,
+      ipRating: product.ipRating || null, cabinetDepthMm: product.cabinetDepthMm || null,
+      moduleDepthMm: product.moduleDepthMm || null, lifespanHours: product.lifespanHours || null,
+      warrantyYears: product.warrantyYears || null,
+      opTempMin: product.opTempMin != null ? product.opTempMin : null,
+      opTempMax: product.opTempMax != null ? product.opTempMax : null,
+    };
+
     return {
       mode: params.mode, micro, sku: pr.sku, pitch,
       product: { id: product.id, series: product.series, type: product.type },
@@ -238,7 +269,10 @@
       builtWft: mmToFt(builtWmm), builtHft: mmToFt(builtHmm),
       cabCountW, cabCountH, totalCabs,
       modPerCabW, modPerCabH, modPerCab, totalMods,
-      pxW, pxH, totalPixels, areaSqft, ports,
+      pxW, pxH, totalPixels, areaSqft, areaSqm, ports,
+      diagInches, aspectRatio, pixelDensitySqm, minViewingDistanceM,
+      perCabWeightKg, screenWeightKg, avgPowerW, maxPowerW, recommendedSupplyKw,
+      tech,
       lines, subtotal, totalGst, grandTotal,
       curve,
     };

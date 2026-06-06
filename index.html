@@ -232,12 +232,12 @@ function PrintSheet({r,meta,preview}){
   if(!r) return null;
   const ink="#1A1208",muted="#6B5E4A",mg=C.magenta;
   const Row=({k,v,accent})=>(
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"6px 0",borderBottom:"1px solid #E4DCCB"}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"4.5px 0",borderBottom:"1px solid #E4DCCB"}}>
       <span style={{fontSize:11,letterSpacing:.4,textTransform:"uppercase",color:muted,fontWeight:600}}>{k}</span>
       <span style={{fontFamily:MO,fontSize:12.5,fontWeight:600,color:accent||ink}}>{v}</span>
     </div>
   );
-  const SectionH=({children})=>(<div style={{fontSize:11,letterSpacing:2,color:mg,fontWeight:700,textTransform:"uppercase",margin:"16px 0 8px"}}>{children}</div>);
+  const SectionH=({children})=>(<div style={{fontSize:11,letterSpacing:2,color:mg,fontWeight:700,textTransform:"uppercase",margin:"12px 0 6px"}}>{children}</div>);
   const cv=r.curve;
   return (
     <div className={preview?"":"vr-print"} style={{background:"#fff",color:ink,fontFamily:MN,padding:0,display:preview?"block":undefined}}>
@@ -296,9 +296,56 @@ function PrintSheet({r,meta,preview}){
           <Row k="Pixel resolution" v={`${num(r.pxW)} × ${num(r.pxH)} px`}/>
           <Row k="Total pixels" v={num(r.totalPixels)}/>
           <Row k="Active area" v={`${num(r.areaSqft,1)} sqft`}/>
+          <Row k="Screen diagonal" v={`${num(r.diagInches,1)} in (${num(r.diagInches/12,2)} ft)`}/>
+          <Row k="Aspect ratio" v={r.aspectRatio}/>
+          <Row k="Pixel density" v={`${num(r.pixelDensitySqm)} px/sqm`}/>
+          <Row k="Min. viewing distance" v={`${num(r.minViewingDistanceM,1)} m`}/>
           <Row k="Controller ports" v={String(r.ports)}/>
         </div>
       </div>
+
+      {/* Power & Weight — both modes */}
+      <div className="avoid-break" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginTop:6}}>
+        <div>
+          <SectionH>Power</SectionH>
+          <Row k="Avg power consumption" v={`${num(r.avgPowerW)} W (${num(r.avgPowerW/1000,2)} kW)`}/>
+          <Row k="Max power consumption" v={`${num(r.maxPowerW)} W (${num(r.maxPowerW/1000,2)} kW)`}/>
+          <Row k="Recommended supply" v={`${num(r.recommendedSupplyKw)} kW`} accent={mg}/>
+          <Row k="AC input" v="100-240V 50/60 Hz"/>
+        </div>
+        <div>
+          <SectionH>Weight</SectionH>
+          <Row k="Per cabinet" v={`${num(r.perCabWeightKg,1)} kg`}/>
+          <Row k="Screen weight (cabinets)" v={`${num(r.screenWeightKg)} kg`}/>
+          {r.curve && <Row k="Steel structure (est.)" v={`~${num(r.curve.steelWeightKg)} kg`}/>}
+          {r.curve && <Row k="Total system weight (est.)" v={`~${num(r.screenWeightKg + r.curve.steelWeightKg)} kg`} accent={mg}/>}
+        </div>
+      </div>
+
+      {/* Technical Specifications — both modes */}
+      {r.tech && r.tech.brightnessNits && (
+        <div className="avoid-break" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginTop:6}}>
+          <div>
+            <SectionH>Technical Specifications</SectionH>
+            <Row k="Display technology" v={r.tech.displayTech || "—"}/>
+            <Row k="LED type" v={r.tech.ledType || "—"}/>
+            <Row k="Cabinet depth" v={r.tech.cabinetDepthMm ? `${r.tech.cabinetDepthMm} mm` : "—"}/>
+            <Row k="Module depth" v={r.tech.moduleDepthMm ? `${r.tech.moduleDepthMm} mm` : "—"}/>
+            <Row k="Ingress protection" v={r.tech.ipRating || "—"}/>
+            <Row k="Bit depth" v={r.tech.bitDepth ? `${r.tech.bitDepth}-bit (${num(Math.pow(2,r.tech.bitDepth))} levels)` : "—"}/>
+          </div>
+          <div>
+            <SectionH>Image & Reliability</SectionH>
+            <Row k="Max brightness" v={`${num(r.tech.brightnessNits)} nits`} accent={C.amber}/>
+            <Row k="Refresh rate" v={`${num(r.tech.refreshHz)} Hz`}/>
+            <Row k="Contrast (static / dynamic)" v={`${num(r.tech.contrastStatic)}:1 / ${num(r.tech.contrastDynamic)}:1`}/>
+            <Row k="Viewing angle" v={r.tech.viewingAngleDeg ? `≤ ${r.tech.viewingAngleDeg}°` : "—"}/>
+            <Row k="Colour gamut" v={`${num(r.tech.colorGamutSrgbPct)}% sRGB · ${num(r.tech.colorGamutRec2020Pct)}% Rec.2020`}/>
+            <Row k="Operating temperature" v={(r.tech.opTempMin!=null) ? `${r.tech.opTempMin}°C to ${r.tech.opTempMax}°C @ 10-90% RH` : "—"}/>
+            <Row k="Lifespan / Warranty" v={`~${num((r.tech.lifespanHours||0)/1000)}k hrs · ${r.tech.warrantyYears||"—"} yr warranty`}/>
+          </div>
+        </div>
+      )}
 
       {/* curved geometry + structure */}
       {r.mode==="curved"&&(
@@ -313,13 +360,12 @@ function PrintSheet({r,meta,preview}){
             <Row k="Curve verdict" v={cv.verdict} accent={verdictColor(cv.verdict)}/>
           </div>
           <div>
-            <SectionH>Structure & Power</SectionH>
+            <SectionH>Structure & Mounting</SectionH>
             <Row k="Mounting strategy" v={cv.structuralStrategy}/>
             <Row k="Cantilever @ centre" v={`${num(cv.cantileverAtCenter,0)} mm`}/>
-            <Row k="Steel structure (est.)" v={`~${num(cv.steelWeightKg,0)} kg`}/>
-            <Row k="Screen weight" v={`${num(cv.totalWeight,0)} kg`}/>
-            <Row k="Recommended supply" v={`${num(cv.recommendedSupply)} kW`} accent={mg}/>
-            <Row k="Peak power" v={`${num(cv.maxPower/1000,2)} kW`}/>
+            <Row k="Wall contact" v={cv.wallContactAtEnds}/>
+            <Row k="Vertical posts" v={`${cv.vertPosts}`}/>
+            <Row k="Horizontal rails" v={`${cv.horizRails}`}/>
           </div>
         </div>
       )}
@@ -983,12 +1029,14 @@ function App(){
               <Metric label="Built screen" value={`${num(result.builtWft,2)} × ${num(result.builtHft,2)}`} unit="ft" accent={C.amber} sub={`${num(result.builtWmm)} × ${num(result.builtHmm)} mm · snapped to whole cabinets`}/>
               <Metric label="Cabinets (W × H)" value={`${result.cabCountW} × ${result.cabCountH}`} sub={`${result.totalCabs} cabinets · ${num(result.totalMods)} modules`}/>
               <Metric label="Pixel resolution" value={`${num(result.pxW)} × ${num(result.pxH)}`} sub={`${num(result.totalPixels)} px · pitch ${result.pitch}mm`}/>
+              <Metric label="Diagonal · Aspect" value={`${num(result.diagInches,1)}″ · ${result.aspectRatio}`} sub={`${num(result.pixelDensitySqm)} px/sqm · min view ${num(result.minViewingDistanceM,1)} m`}/>
               <Metric label="Active area" value={num(result.areaSqft,1)} unit="sqft" sub={`${result.ports} controller port(s)`}/>
+              <Metric label="Brightness · Refresh" value={`${num(result.tech.brightnessNits)} nits · ${num(result.tech.refreshHz)} Hz`} sub={`${result.tech.displayTech||""} · ${result.tech.ipRating||""}`}/>
+              <Metric label="Weight · Supply" value={`${num(result.screenWeightKg)} kg · ${num(result.recommendedSupplyKw)} kW`} sub={`avg ${num(result.avgPowerW/1000,2)} kW · max ${num(result.maxPowerW/1000,2)} kW`}/>
               {mode==="curved"&&cv&&(<>
                 <Metric label="Radius (R)" value={num(cv.R/1000,2)} unit="m" accent={C.amber} sub={`= ${num(cv.R,0)} mm`}/>
                 <Metric label={cv.curveType==="outer"?"Sagitta · cantilever":"Sagitta · depth"} value={num(cv.sag,0)} unit="mm" sub={`arc length ${num(cv.arcLen,0)} mm`}/>
                 <Metric label="Per-joint back gap" value={num(cv.gapPerJoint,1)} unit="mm" accent={verdictColor(cv.verdict)} sub={`wedge ${num(cv.cabAngleDeg,2)}° · ${cv.verdict}`}/>
-                <Metric label="Avg / Peak power" value={`${num(cv.avgPower/1000,1)} / ${num(cv.maxPower/1000,1)}`} unit="kW" sub={`recommended supply ${num(cv.recommendedSupply)} kW`}/>
               </>)}
               <Metric label="Grand Total" value={E.fmtINR(result.grandTotal)} accent={C.magenta} sub={`incl. GST · subtotal ${E.fmtINR(result.subtotal)}`}/>
               <div style={{marginTop:14,padding:12,background:C.navy,borderRadius:8,fontSize:11,color:C.lavender,opacity:.7,fontFamily:MO,lineHeight:1.5}}>

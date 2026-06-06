@@ -47,28 +47,49 @@
   <!-- Product catalogue. moduleW/H and cabinet W/H in mm. -->
   <products>
 
-    <product id="outdoor" series="Reyansh Outdoor" type="MiniLED" env="outdoor" moduleW="320" moduleH="160">
-      <cabinet w="640"  h="640"  label="640×640mm" />
-      <cabinet w="960"  h="960"  label="960×960mm" />
-      <cabinet w="960"  h="1280" label="960×1280mm" />
-      <cabinet w="1280" h="1280" label="1280×1280mm" />
+    <product id="outdoor" series="Reyansh Outdoor" type="MiniLED" env="outdoor" moduleW="320" moduleH="160"
+             displayTech="SMD MiniLED" ledType="TrueHue SMD1921 (Nationstar/Kinglight)"
+             brightnessNits="5500" refreshHz="3840" bitDepth="14"
+             viewingAngleDeg="155" contrastStatic="6000" contrastDynamic="200000"
+             colorGamutSrgbPct="110" colorGamutRec2020Pct="85"
+             ipRating="IP65" maxPowerSqm="800" avgPowerSqm="500"
+             warrantyYears="5" cabinetDepthMm="75" moduleDepthMm="16"
+             lifespanHours="100000" opTempMin="-10" opTempMax="50" vdMultiplier="1.0">
+      <cabinet w="640"  h="640"  label="640×640mm"   weight="8" />
+      <cabinet w="960"  h="960"  label="960×960mm"   weight="14" />
+      <cabinet w="960"  h="1280" label="960×1280mm"  weight="18" />
+      <cabinet w="1280" h="1280" label="1280×1280mm" weight="23" />
       <pitch pp="6.67" rate="5000"  gst="18" sku="Reyansh Outdoor P6.67" />
       <pitch pp="4"    rate="5500"  gst="18" sku="Reyansh Outdoor P4" />
       <pitch pp="3"    rate="7250"  gst="18" sku="Reyansh Outdoor P3" />
       <pitch pp="2.5"  rate="12500" gst="18" sku="Reyansh Outdoor P2.5" />
     </product>
 
-    <product id="indoor" series="Reyansh Indoor" type="MiniLED" env="indoor" moduleW="320" moduleH="160">
-      <cabinet w="640" h="480" label="640×480mm" />
-      <cabinet w="640" h="640" label="640×640mm" />
+    <product id="indoor" series="Reyansh Indoor" type="MiniLED" env="indoor" moduleW="320" moduleH="160"
+             displayTech="SMD MiniLED" ledType="Kinglight TrueHue MiniLED"
+             brightnessNits="700" refreshHz="7680" bitDepth="14"
+             viewingAngleDeg="160" contrastStatic="6000" contrastDynamic="200000"
+             colorGamutSrgbPct="120" colorGamutRec2020Pct="93"
+             ipRating="IP54" maxPowerSqm="400" avgPowerSqm="200"
+             warrantyYears="2" cabinetDepthMm="80" moduleDepthMm="16"
+             lifespanHours="100000" opTempMin="-10" opTempMax="50" vdMultiplier="1.0">
+      <cabinet w="640" h="480" label="640×480mm" weight="6" />
+      <cabinet w="640" h="640" label="640×640mm" weight="7" />
       <pitch pp="2.5"  rate="7500"  gst="18" sku="Reyansh Indoor P2.5" />
       <pitch pp="1.86" rate="10500" gst="18" sku="Reyansh Indoor P1.86" />
       <pitch pp="1.56" rate="23000" gst="28" sku="Reyansh Indoor P1.56" />
     </product>
 
-    <product id="microled" series="Leynna MicroLED" type="MicroLED" env="indoor" moduleW="300" moduleH="168.75">
-      <cabinet w="600"   h="337.5" label="600×337.5mm" />
-      <cabinet w="609.6" h="342.9" label="609.6×342.9mm" />
+    <product id="microled" series="Leynna MicroLED" type="MicroLED" env="indoor" moduleW="300" moduleH="168.75"
+             displayTech="COB MicroLED" ledType="Flip-Chip COB"
+             brightnessNits="800" refreshHz="7680" bitDepth="16"
+             viewingAngleDeg="175" contrastStatic="10000" contrastDynamic="1000000"
+             colorGamutSrgbPct="125" colorGamutRec2020Pct="95"
+             ipRating="IP30" maxPowerSqm="350" avgPowerSqm="200"
+             warrantyYears="3" cabinetDepthMm="40" moduleDepthMm="14"
+             lifespanHours="100000" opTempMin="0" opTempMax="40" vdMultiplier="0.6">
+      <cabinet w="600"   h="337.5" label="600×337.5mm" weight="5" />
+      <cabinet w="609.6" h="342.9" label="609.6×342.9mm" weight="5" />
       <pitch pp="1.56" rate="23000" gst="28" sku="Leynna Cosmo P1.56" />
       <pitch pp="1.25" rate="25000" gst="28" sku="Leynna Cosmo P1.25" />
       <pitch pp="1.17" rate="23500" gst="28" sku="Leynna Cosmo P1.17" />
