@@ -464,55 +464,40 @@ const KB = {
     chips: [ { t:"Quote flat", go:"flat" }, { t:"Quote curved", go:"curved" }, { t:"That's all", go:"root" } ] },
 };
 
-/* ───────── unit converter (floating utility, bottom-left) ───────── */
+/* ───────── inline unit converter (sits under Size in Inputs panel) ───────── */
 const UNIT_TO_MM = { mm:1, cm:10, m:1000, ft:304.8, inch:25.4 };
 function UnitConverter(){
-  const [open,setOpen]=useState(()=> typeof location!=="undefined" && new URLSearchParams(location.search).get("uc")==="1");
-  const [value,setValue]=useState("1000");
-  const [from,setFrom]=useState("mm");
+  const [value,setValue]=useState("");
+  const [from,setFrom]=useState("ft");
   const v = parseFloat(value);
   const inMm = isFinite(v) ? v * UNIT_TO_MM[from] : 0;
   const fmt = (n,d)=> isFinite(n) ? Number(n).toLocaleString(undefined,{maximumFractionDigits:d}) : "—";
   const rows = [
-    { u:"mm",   v: inMm,                  d: 2 },
-    { u:"cm",   v: inMm / 10,             d: 3 },
-    { u:"m",    v: inMm / 1000,           d: 4 },
-    { u:"ft",   v: inMm / 304.8,          d: 4 },
-    { u:"inch", v: inMm / 25.4,           d: 3 },
+    { u:"mm",   v: inMm,                  d: 1 },
+    { u:"cm",   v: inMm / 10,             d: 2 },
+    { u:"m",    v: inMm / 1000,           d: 3 },
+    { u:"ft",   v: inMm / 304.8,          d: 3 },
+    { u:"inch", v: inMm / 25.4,           d: 2 },
   ].filter(r => r.u !== from);
   return (
-    <div style={{position:"fixed",left:18,bottom:18,zIndex:200,fontFamily:MN}}>
-      {open && (
-        <div style={{width:260,background:C.navyLight,border:`1px solid ${C.line}`,borderRadius:14,boxShadow:"0 18px 60px rgba(0,0,0,.5)",overflow:"hidden",marginBottom:12}}>
-          <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px",borderBottom:`1px solid ${C.line}`,background:`linear-gradient(90deg, ${C.purple}, ${C.magenta})`}}>
-            <span style={{fontSize:14,fontWeight:700,color:C.cream,flex:1}}>📐 Unit Converter</span>
-            <button onClick={()=>setOpen(false)} style={{background:"transparent",border:"none",color:C.cream,fontSize:18,cursor:"pointer",lineHeight:1}}>×</button>
+    <div style={{marginTop:14,padding:12,background:C.navy,border:`1px solid ${C.line}`,borderRadius:10}}>
+      <div style={{fontSize:10,letterSpacing:1.6,textTransform:"uppercase",color:C.lavender,fontWeight:600,marginBottom:8,fontFamily:MN,opacity:.75}}>📐 Unit Converter</div>
+      <div style={{display:"flex",gap:6,marginBottom:8}}>
+        <input type="number" value={value} onChange={e=>setValue(e.target.value)} step="any" placeholder="value"
+          style={{flex:1,background:C.navyLight,border:`1px solid ${C.line}`,color:C.cream,padding:"8px 10px",borderRadius:6,fontFamily:MO,fontSize:13,outline:"none",minWidth:0}}/>
+        <select value={from} onChange={e=>setFrom(e.target.value)}
+          style={{background:C.navyLight,border:`1px solid ${C.line}`,color:C.cream,padding:"8px 6px",borderRadius:6,fontFamily:MO,fontSize:12,cursor:"pointer"}}>
+          {Object.keys(UNIT_TO_MM).map(u=><option key={u} value={u} style={{background:C.navyLight}}>{u}</option>)}
+        </select>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"3px 12px"}}>
+        {rows.map(r=>(
+          <div key={r.u} style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
+            <span style={{fontSize:10,textTransform:"uppercase",letterSpacing:1.2,color:C.lavender,opacity:.55,fontWeight:600}}>{r.u}</span>
+            <span style={{fontFamily:MO,fontSize:12,color:value!==""?C.cream:C.lavender,opacity:value!==""?1:.4,fontWeight:600}}>{value!==""?fmt(r.v,r.d):"—"}</span>
           </div>
-          <div style={{padding:12,display:"flex",flexDirection:"column",gap:10}}>
-            <div style={{display:"flex",gap:6}}>
-              <input type="number" value={value} onChange={e=>setValue(e.target.value)} step="any"
-                style={{flex:1,background:C.navy,border:`1px solid ${C.line}`,color:C.cream,padding:"9px 11px",borderRadius:8,fontFamily:MO,fontSize:14,outline:"none",minWidth:0}}/>
-              <select value={from} onChange={e=>setFrom(e.target.value)}
-                style={{background:C.navy,border:`1px solid ${C.line}`,color:C.cream,padding:"9px 8px",borderRadius:8,fontFamily:MO,fontSize:13,cursor:"pointer"}}>
-                {Object.keys(UNIT_TO_MM).map(u=><option key={u} value={u} style={{background:C.navyLight}}>{u}</option>)}
-              </select>
-            </div>
-            <div style={{display:"flex",flexDirection:"column",gap:5}}>
-              {rows.map(r=>(
-                <div key={r.u} style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"5px 0",borderBottom:`1px dashed ${C.line}`}}>
-                  <span style={{fontSize:11,textTransform:"uppercase",letterSpacing:1.5,color:C.lavender,opacity:.65,fontWeight:600}}>{r.u}</span>
-                  <span style={{fontFamily:MO,fontSize:13,color:C.cream,fontWeight:600}}>{fmt(r.v,r.d)}</span>
-                </div>
-              ))}
-            </div>
-            <div style={{fontSize:10,color:C.lavender,opacity:.55,fontFamily:MO,letterSpacing:.5}}>1 ft = 304.8 mm · 1 inch = 25.4 mm</div>
-          </div>
-        </div>
-      )}
-      <button onClick={()=>setOpen(o=>!o)} aria-label="Open unit converter"
-        style={{width:48,height:48,borderRadius:"50%",border:"none",cursor:"pointer",background:open?C.navyLight:`linear-gradient(135deg, ${C.purple}, ${C.magenta})`,boxShadow:"0 8px 22px rgba(157,32,214,.35)",color:C.cream,fontSize:20,display:"flex",alignItems:"center",justifyContent:"center"}}>
-        {open?"✕":"📐"}
-      </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -992,6 +977,8 @@ function App(){
                 <Field label="Height" unit="ft" hint={`${num(Number(heightFt)*304.8,0)} mm`}><NumInput value={heightFt} onChange={setHeightFt} min={0.5} max={100} step={0.5}/></Field>
               </div>
 
+              <UnitConverter/>
+
               {mode==="curved"&&(
                 <div>
                   <div style={{fontSize:10,letterSpacing:2,color:C.magenta,textTransform:"uppercase",fontWeight:700,margin:"22px 0 10px"}}>3 · Curve</div>
@@ -1148,7 +1135,6 @@ function App(){
       </div>
 
       <Assistant api={assistantApi}/>
-      <UnitConverter/>
       {historyOpen && <HistoryPanel history={history} onOpen={openQuote} onDelete={deleteQuote} onClose={()=>setHistoryOpen(false)}/>}
       {compareOpen && <ComparePanel items={compareSet} db={db} onLoad={(cfg)=>{openQuote(cfg);setCompareOpen(false);}} onRemove={removeCompare} onClear={()=>saveCompare([])} onClose={()=>setCompareOpen(false)}/>}
     </div>
