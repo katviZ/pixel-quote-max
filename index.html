@@ -14,15 +14,34 @@
     --fr:'Fraunces',Georgia,serif; --mn:'Manrope',system-ui,sans-serif; --mo:'JetBrains Mono',ui-monospace,monospace;
   }
   *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
   html,body{margin:0;padding:0;background:var(--navy);color:var(--cream);font-family:var(--mn);}
-  button{font-family:var(--mn);}
-  input,select{font-family:var(--mo);}
+  button{font-family:var(--mn);transition:transform .12s ease, box-shadow .25s ease, background .25s ease, border-color .25s ease;}
+  button:active{transform:scale(.96);}
+  input,select{font-family:var(--mo);transition:border-color .2s ease, box-shadow .2s ease;}
   .vr-scroll::-webkit-scrollbar{width:8px;}
   .vr-scroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px;}
 
   /* three-column cockpit; collapses to one column on narrow screens */
   .vr-cockpit{display:grid;grid-template-columns:330px minmax(0,1fr) 360px;gap:18px;align-items:start;}
   @media (max-width:1240px){ .vr-cockpit{grid-template-columns:1fr;} .vr-sticky{position:static!important;max-height:none!important;} }
+
+  /* entrance animation — staggered fade+rise */
+  @keyframes vr-rise { from { opacity:0; transform: translateY(14px); } to { opacity:1; transform: translateY(0); } }
+  .vr-rise { animation: vr-rise .55s cubic-bezier(.2,.8,.2,1) both; }
+  .vr-rise-1 { animation-delay: .05s; } .vr-rise-2 { animation-delay: .15s; } .vr-rise-3 { animation-delay: .25s; }
+
+  /* panel hover lift */
+  .vr-lift{transition: transform .2s ease, box-shadow .25s ease, border-color .25s ease;}
+  .vr-lift:hover{transform: translateY(-2px); box-shadow: 0 12px 30px rgba(157,32,214,.18), 0 0 0 1px rgba(157,32,214,.25);}
+
+  /* top bar gradient sweep */
+  @keyframes vr-sweep { 0%{background-position:0% 50%;} 50%{background-position:100% 50%;} 100%{background-position:0% 50%;} }
+  .vr-sweep{ background-size: 200% 100%; animation: vr-sweep 16s ease-in-out infinite; }
+
+  /* mode/tab content fade */
+  @keyframes vr-fadein { from { opacity:0; } to { opacity:1; } }
+  .vr-fade { animation: vr-fadein .25s ease-out both; }
 
   .vr-print{display:none;}
   @media print{
@@ -109,7 +128,29 @@ function Pill({active,onClick,children}){
 }
 const headerBtn=(active)=>({background:active?C.magenta:"transparent",color:active?C.cream:C.lavender,border:`1px solid ${active?C.magenta:C.line}`,padding:"9px 16px",borderRadius:999,fontWeight:700,fontSize:12,letterSpacing:.8,textTransform:"uppercase",cursor:"pointer",transition:"all .15s"});
 function Panel({children,accent,style}){
-  return <div style={{background:C.navyLight,border:`1px solid ${C.line}`,borderLeft:accent?`3px solid ${accent}`:`1px solid ${C.line}`,borderRadius:12,padding:18,...style}}>{children}</div>;
+  return <div className="vr-lift" style={{background:C.navyLight,border:`1px solid ${C.line}`,borderLeft:accent?`3px solid ${accent}`:`1px solid ${C.line}`,borderRadius:12,padding:18,...style}}>{children}</div>;
+}
+
+/* Animated number — rolls from previous to next on change */
+function AnimatedNumber({ value, format }){
+  const [v,setV]=useState(value);
+  const fromRef = React.useRef(value);
+  const startRef = React.useRef(0);
+  useEffect(()=>{
+    const from = fromRef.current, to = value;
+    if(from === to) return;
+    const dur = 600; let raf;
+    const start = performance.now(); startRef.current = start;
+    const tick = (t)=>{
+      const p = Math.min(1, (t-start)/dur);
+      const eased = 1 - Math.pow(1-p, 3);
+      setV(from + (to-from) * eased);
+      if(p<1) raf = requestAnimationFrame(tick); else { fromRef.current = to; setV(to); }
+    };
+    raf = requestAnimationFrame(tick);
+    return ()=> raf && cancelAnimationFrame(raf);
+  },[value]);
+  return <>{format ? format(Math.round(v)) : Math.round(v)}</>;
 }
 function Metric({label,value,unit,accent,sub}){
   return (
@@ -874,7 +915,7 @@ function App(){
     {Q.get("forceprint")==="1" && <style>{".vr-screen{display:none!important}.vr-print{display:block!important}"}</style>}
     <div className="vr-screen" style={{minHeight:"100vh",background:C.navy}}>
       {/* top bar */}
-      <div style={{position:"sticky",top:0,zIndex:50,background:C.navy+"E6",backdropFilter:"blur(10px)",borderBottom:`1px solid ${C.line}`}}>
+      <div className="vr-sweep" style={{position:"sticky",top:0,zIndex:50,background:`linear-gradient(90deg, ${C.navy}EE 0%, ${C.navyLight}EE 50%, ${C.navy}EE 100%)`,backdropFilter:"blur(10px)",borderBottom:`1px solid ${C.line}`}}>
         <div style={{maxWidth:1500,margin:"0 auto",padding:"12px 22px",display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
           <div style={{marginRight:"auto",display:"flex",alignItems:"center",gap:12}}>
             <VRLogo size={36}/>
@@ -901,7 +942,7 @@ function App(){
         <div className="vr-cockpit">
 
           {/* INPUTS */}
-          <div className="vr-sticky vr-scroll" style={{position:"sticky",top:80,maxHeight:"calc(100vh - 104px)",overflowY:"auto",paddingRight:4}}>
+          <div className="vr-sticky vr-scroll vr-rise vr-rise-1" style={{position:"sticky",top:80,maxHeight:"calc(100vh - 104px)",overflowY:"auto",paddingRight:4}}>
             <Panel>
               <h2 style={{fontFamily:FR,fontSize:19,margin:"0 0 2px"}}>Inputs</h2>
               <div style={{fontSize:11,color:C.lavender,opacity:.7,marginBottom:16}}>Screen size in feet · cabinet/curve in mm</div>
@@ -979,7 +1020,7 @@ function App(){
           </div>
 
           {/* STAGE */}
-          <div style={{display:"flex",flexDirection:"column",gap:16,minWidth:0}}>
+          <div className="vr-rise vr-rise-2" style={{display:"flex",flexDirection:"column",gap:16,minWidth:0}}>
 
             {/* Smart fit cards — nearest vs optimal */}
             {fits && (fits.nearest || fits.optimal) && (() => {
@@ -1025,7 +1066,7 @@ function App(){
                 {stageTabs.map(t=><button key={t.k} onClick={()=>setStageTab(t.k)} style={headerBtn(stageTab===t.k)}>{t.l}</button>)}
                 <div style={{marginLeft:"auto",alignSelf:"center",fontFamily:MO,fontSize:11,color:C.lavender,opacity:.7}}>{mode==="curved"?(curveType==="outer"?"OUTER · CONVEX":"INNER · CONCAVE"):"FLAT PANEL"}</div>
               </div>
-              <div style={{position:"relative",padding:16}}>
+              <div key={mode+"-"+stageTab} className="vr-fade" style={{position:"relative",padding:16}}>
                 {stageTab==="elevation"&&<ElevationDrawing wmm={result.builtWmm} hmm={result.builtHmm} cabCountW={result.cabCountW} cabCountH={result.cabCountH} modPerCabW={result.modPerCabW} modPerCabH={result.modPerCabH}/>}
                 {stageTab==="plan"&&cv&&<PlanDrawing chord={cv.chordMm} R={cv.R} sag={cv.sag} cabCountW={result.cabCountW} curveType={cv.curveType}/>}
                 {stageTab==="section"&&cv&&<div style={{maxWidth:380,margin:"0 auto"}}><SectionDrawing sag={cv.sag} curveType={cv.curveType}/></div>}
@@ -1075,7 +1116,7 @@ function App(){
           </div>
 
           {/* METRICS */}
-          <div className="vr-sticky vr-scroll" style={{position:"sticky",top:80,maxHeight:"calc(100vh - 104px)",overflowY:"auto",paddingRight:4}}>
+          <div className="vr-sticky vr-scroll vr-rise vr-rise-3" style={{position:"sticky",top:80,maxHeight:"calc(100vh - 104px)",overflowY:"auto",paddingRight:4}}>
             <Panel>
               <h2 style={{fontFamily:FR,fontSize:19,margin:"0 0 2px"}}>Computed</h2>
               <div style={{fontSize:11,color:C.lavender,opacity:.7,marginBottom:6}}>{result.product.series} · P{result.pitch}</div>
@@ -1091,7 +1132,7 @@ function App(){
                 <Metric label={cv.curveType==="outer"?"Sagitta · cantilever":"Sagitta · depth"} value={num(cv.sag,0)} unit="mm" sub={`arc length ${num(cv.arcLen,0)} mm`}/>
                 <Metric label="Per-joint back gap" value={num(cv.gapPerJoint,1)} unit="mm" accent={verdictColor(cv.verdict)} sub={`wedge ${num(cv.cabAngleDeg,2)}° · ${cv.verdict}`}/>
               </>)}
-              <Metric label="Grand Total" value={E.fmtINR(result.grandTotal)} accent={C.magenta} sub={`incl. GST · subtotal ${E.fmtINR(result.subtotal)}`}/>
+              <Metric label="Grand Total" value={<AnimatedNumber value={result.grandTotal} format={E.fmtINR}/>} accent={C.magenta} sub={`incl. GST · subtotal ${E.fmtINR(result.subtotal)}`}/>
               <div style={{marginTop:14,padding:12,background:C.navy,borderRadius:8,fontSize:11,color:C.lavender,opacity:.7,fontFamily:MO,lineHeight:1.5}}>
                 {dbErr==="offline"?"⚠ Using built-in price fallback (open via a web server to read pixel-data.xml). ":""}
                 Export PDF generates a clean spec + quote sheet with drawings.
