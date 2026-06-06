@@ -48,6 +48,7 @@
   <products>
 
     <product id="outdoor" series="Reyansh Outdoor" type="MiniLED" env="outdoor" moduleW="320" moduleH="160">
+      <cabinet w="640"  h="640"  label="640×640mm" />
       <cabinet w="960"  h="960"  label="960×960mm" />
       <cabinet w="960"  h="1280" label="960×1280mm" />
       <cabinet w="1280" h="1280" label="1280×1280mm" />
@@ -59,6 +60,7 @@
 
     <product id="indoor" series="Reyansh Indoor" type="MiniLED" env="indoor" moduleW="320" moduleH="160">
       <cabinet w="640" h="480" label="640×480mm" />
+      <cabinet w="640" h="640" label="640×640mm" />
       <pitch pp="2.5"  rate="7500"  gst="18" sku="Reyansh Indoor P2.5" />
       <pitch pp="1.86" rate="10500" gst="18" sku="Reyansh Indoor P1.86" />
       <pitch pp="1.56" rate="23000" gst="28" sku="Reyansh Indoor P1.56" />

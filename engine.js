@@ -141,9 +141,11 @@
     const micro = isMicro(product);
     const pitch = parseFloat(params.pitch);
     const cab = product.cabinets[Math.min(params.cabIndex || 0, product.cabinets.length - 1)];
-    const cabW = cab.w, cabH = cab.h;
-    const modW = params.moduleW || product.moduleW;
-    const modH = params.moduleH || product.moduleH;
+    const rotated = params.orientation === "rotated";
+    const cabW = rotated ? cab.h : cab.w;
+    const cabH = rotated ? cab.w : cab.h;
+    const modW = rotated ? (params.moduleH || product.moduleH) : (params.moduleW || product.moduleW);
+    const modH = rotated ? (params.moduleW || product.moduleW) : (params.moduleH || product.moduleH);
 
     const reqWmm = ftToMm(params.widthFt);
     const reqHmm = ftToMm(params.heightFt);
@@ -242,6 +244,46 @@
     };
   }
 
+  /* ---------- smart fit-finder ----------
+     For a given product + requested width/height (ft), evaluates every
+     cabinet × {native, rotated} and returns the best NEAREST (≤ input) and
+     best OPTIMAL (≥ input) fits by minimum total waste. */
+  function findFits(params, db) {
+    const product = getProduct(db, params.productId);
+    if (!product) return null;
+    const reqW = ftToMm(parseFloat(params.widthFt) || 0);
+    const reqH = ftToMm(parseFloat(params.heightFt) || 0);
+    if (reqW <= 0 || reqH <= 0) return { nearest: null, optimal: null };
+
+    let bestOpt = null, bestNear = null;
+    product.cabinets.forEach((cab, cabIndex) => {
+      const orientations = cab.w === cab.h ? ["native"] : ["native", "rotated"];
+      orientations.forEach((orientation) => {
+        const cw = orientation === "rotated" ? cab.h : cab.w;
+        const ch = orientation === "rotated" ? cab.w : cab.h;
+
+        const ncWup = Math.max(1, Math.ceil(reqW / cw));
+        const ncHup = Math.max(1, Math.ceil(reqH / ch));
+        const builtW = ncWup * cw, builtH = ncHup * ch;
+        const wasteUp = (builtW - reqW) + (builtH - reqH);
+        const optRec = { cabIndex, orientation, cabW: cw, cabH: ch, cabLabel: cab.label,
+                         cabCountW: ncWup, cabCountH: ncHup, builtWmm: builtW, builtHmm: builtH, waste: wasteUp };
+        if (!bestOpt || wasteUp < bestOpt.waste) bestOpt = optRec;
+
+        const ncWdn = Math.floor(reqW / cw);
+        const ncHdn = Math.floor(reqH / ch);
+        if (ncWdn >= 1 && ncHdn >= 1) {
+          const builtWdn = ncWdn * cw, builtHdn = ncHdn * ch;
+          const wasteDn = (reqW - builtWdn) + (reqH - builtHdn);
+          const nearRec = { cabIndex, orientation, cabW: cw, cabH: ch, cabLabel: cab.label,
+                            cabCountW: ncWdn, cabCountH: ncHdn, builtWmm: builtWdn, builtHmm: builtHdn, waste: wasteDn };
+          if (!bestNear || wasteDn < bestNear.waste) bestNear = nearRec;
+        }
+      });
+    });
+    return { nearest: bestNear, optimal: bestOpt };
+  }
+
   function quoteRef(date) {
     const d = date || new Date();
     const yr = d.getFullYear();
@@ -253,6 +295,6 @@
     MM_PER_FT, ftToMm, mmToFt, fmtINR, PRESETS,
     parseDbXml, getProduct, isMicro,
     priceForPitch, controllerPrice, installRate,
-    radiusFrom, curveMetrics, computeQuote, quoteRef,
+    radiusFrom, curveMetrics, computeQuote, findFits, quoteRef,
   };
 });

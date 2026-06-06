@@ -47,11 +47,11 @@
   <controllers type="micro"><tier maxPorts="3" price="125000" /><tier maxPorts="7" price="150000" /><tier maxPorts="12" price="200000" /><tier maxPorts="20" price="250000" /><tier maxPorts="999" price="350000" /></controllers>
   <products>
     <product id="outdoor" series="Reyansh Outdoor" type="MiniLED" env="outdoor" moduleW="320" moduleH="160">
-      <cabinet w="960" h="960" label="960×960mm" /><cabinet w="960" h="1280" label="960×1280mm" /><cabinet w="1280" h="1280" label="1280×1280mm" />
+      <cabinet w="640" h="640" label="640×640mm" /><cabinet w="960" h="960" label="960×960mm" /><cabinet w="960" h="1280" label="960×1280mm" /><cabinet w="1280" h="1280" label="1280×1280mm" />
       <pitch pp="6.67" rate="5000" gst="18" sku="Reyansh Outdoor P6.67" /><pitch pp="4" rate="5500" gst="18" sku="Reyansh Outdoor P4" /><pitch pp="3" rate="7250" gst="18" sku="Reyansh Outdoor P3" /><pitch pp="2.5" rate="12500" gst="18" sku="Reyansh Outdoor P2.5" />
     </product>
     <product id="indoor" series="Reyansh Indoor" type="MiniLED" env="indoor" moduleW="320" moduleH="160">
-      <cabinet w="640" h="480" label="640×480mm" />
+      <cabinet w="640" h="480" label="640×480mm" /><cabinet w="640" h="640" label="640×640mm" />
       <pitch pp="2.5" rate="7500" gst="18" sku="Reyansh Indoor P2.5" /><pitch pp="1.86" rate="10500" gst="18" sku="Reyansh Indoor P1.86" /><pitch pp="1.56" rate="23000" gst="28" sku="Reyansh Indoor P1.56" />
     </product>
     <product id="microled" series="Leynna MicroLED" type="MicroLED" env="indoor" moduleW="300" moduleH="168.75">
@@ -285,7 +285,7 @@ function PrintSheet({r,meta,preview}){
           <Row k="Pixel pitch" v={r.pitch+" mm"}/>
           <Row k="Requested size" v={`${num(r.reqWmm/304.8,2)} × ${num(r.reqHmm/304.8,2)} ft`}/>
           <Row k="Built size" v={`${num(r.builtWft,2)} × ${num(r.builtHft,2)} ft`} accent={mg}/>
-          <Row k="Cabinet" v={r.cab.label}/>
+          <Row k="Cabinet" v={r.cab.label + (r.cabW!==r.cab.w?" · ↺ rotated":"")}/>
           {r.mode==="curved"&&<Row k="Curve type" v={cv.curveType==="outer"?"Outer / Convex":"Inner / Concave"}/>}
         </div>
         <div>
@@ -616,6 +616,9 @@ function App(){
   const [project,setProject]=useState(qDef("proj",sDef("project","")));
   const [client,setClient]=useState(qDef("cl",sDef("client","")));
   const [exportFlash,setExportFlash]=useState(false);
+  const [orientation,setOrientation]=useState(qDef("o",sDef("orientation","native"))==="rotated"?"rotated":"native");
+  const [manualCab,setManualCab]=useState(qDef("mcab",sDef("manualCab",false))===true||qDef("mcab",sDef("manualCab","false"))==="true");
+  const [fitMode,setFitMode]=useState(qDef("ft",sDef("fitMode","optimal"))==="nearest"?"nearest":"optimal");
   const [historyOpen,setHistoryOpen]=useState(false);
   const [history,setHistory]=useState(()=>{ try{ return JSON.parse(localStorage.getItem("pqm_history")||"[]"); }catch{ return []; } });
   const [compareSet,setCompareSet]=useState(()=>{ try{ return JSON.parse(localStorage.getItem("pqm_compare")||"[]"); }catch{ return []; } });
@@ -624,8 +627,8 @@ function App(){
 
   // remember last-used inputs to restore on return
   useEffect(()=>{
-    try{ localStorage.setItem("pqm_session", JSON.stringify({ mode,product:productId,pitch,cabIndex,widthFt,heightFt,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg,project,client })); }catch{}
-  },[mode,productId,pitch,cabIndex,widthFt,heightFt,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg,project,client]);
+    try{ localStorage.setItem("pqm_session", JSON.stringify({ mode,product:productId,pitch,cabIndex,orientation,manualCab,fitMode,widthFt,heightFt,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg,project,client })); }catch{}
+  },[mode,productId,pitch,cabIndex,orientation,manualCab,fitMode,widthFt,heightFt,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg,project,client]);
 
   const acceptPolicy = ()=>{ try{ localStorage.setItem("pqm_agreed",POLICY_VERSION); }catch{} setAgreed(true); };
 
@@ -651,19 +654,40 @@ function App(){
     if(cabIndex>product.cabinets.length-1) setCabIndex(0);
   },[productId,db]);
 
+  const fits = useMemo(()=>{
+    if(!db||!product) return null;
+    try{ return E.findFits({ productId, widthFt:Number(widthFt)||0, heightFt:Number(heightFt)||0 }, db); }catch{ return null; }
+  },[db,product,productId,widthFt,heightFt]);
+
+  // auto-apply chosen fit to cabIndex+orientation (unless manual override)
+  useEffect(()=>{
+    if(manualCab || !fits) return;
+    const f = fits[fitMode] || fits.optimal;
+    if(!f) return;
+    if(f.cabIndex !== cabIndex) setCabIndex(f.cabIndex);
+    if(f.orientation !== orientation) setOrientation(f.orientation);
+  },[fits,fitMode,manualCab]);
+
   const result = useMemo(()=>{
     if(!db||!product) return null;
     try{
       return E.computeQuote({
         mode,productId,pitch,
-        widthFt:Number(widthFt)||0,heightFt:Number(heightFt)||0,cabIndex,
+        widthFt:Number(widthFt)||0,heightFt:Number(heightFt)||0,cabIndex,orientation,
         curveMode,preset,sagittaMm:Number(sagittaMm)||0,radiusMm:Number(radiusMm)||0,
         curveType,cabWeightKg:Number(cabWeightKg)||14,
       },db);
     }catch(e){return null;}
-  },[db,product,mode,productId,pitch,widthFt,heightFt,cabIndex,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg]);
+  },[db,product,mode,productId,pitch,widthFt,heightFt,cabIndex,orientation,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg]);
 
   const meta = useMemo(()=>({project,client,ref:E.quoteRef(),date:new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})}),[project,client,result]);
+
+  const fitResults = useMemo(()=>{
+    if(!db||!product||!fits) return { nearest:null, optimal:null };
+    const opts = { mode, productId, pitch, widthFt:Number(widthFt)||0, heightFt:Number(heightFt)||0, curveMode, preset, sagittaMm:Number(sagittaMm)||0, radiusMm:Number(radiusMm)||0, curveType, cabWeightKg:Number(cabWeightKg)||14 };
+    const safe = (f)=>{ if(!f) return null; try{ return E.computeQuote({...opts,cabIndex:f.cabIndex,orientation:f.orientation},db); }catch{ return null; } };
+    return { nearest: safe(fits.nearest), optimal: safe(fits.optimal) };
+  },[db,product,fits,mode,pitch,widthFt,heightFt,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg]);
 
   // usage-policy gate — must accept to enter (QC/print contexts bypass)
   if(!agreed && Q.get("forceprint")!=="1" && Q.get("sheet")!=="1") return <Gate onAgree={acceptPolicy}/>;
@@ -698,11 +722,13 @@ function App(){
     const rec={ ref:meta.ref, date:meta.date, savedAt:new Date().toISOString(),
       series:result.product.series, sizeFt:`${result.builtWft.toFixed(1)}×${result.builtHft.toFixed(1)} ft`,
       grandTotal:result.grandTotal,
-      mode,productId,pitch,cabIndex,widthFt,heightFt,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg,project,client };
+      mode,productId,pitch,cabIndex,orientation,widthFt,heightFt,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg,project,client };
     saveHistory([rec, ...history.filter(h=>h.ref!==rec.ref)].slice(0,50));
   };
   const openQuote = (h)=>{
+    setManualCab(true); // restoring exact config — disable auto-pick
     setMode(h.mode); setProductId(h.productId); setPitch(h.pitch); setCabIndex(h.cabIndex);
+    setOrientation(h.orientation||"native");
     setWidthFt(h.widthFt); setHeightFt(h.heightFt); setCurveMode(h.curveMode); setPreset(h.preset);
     setSagittaMm(h.sagittaMm); setRadiusMm(h.radiusMm); setCurveType(h.curveType); setCabWeightKg(h.cabWeightKg);
     setProject(h.project||""); setClient(h.client||""); setStageTab(h.mode==="curved"?"plan":"elevation");
@@ -712,13 +738,13 @@ function App(){
 
   // ----- comparison set -----
   const saveCompare = (arr)=>{ setCompareSet(arr); try{ localStorage.setItem("pqm_compare",JSON.stringify(arr)); }catch{} };
-  const addToCompare = ()=>{ saveCompare([...compareSet,{ mode,productId,pitch,cabIndex,widthFt,heightFt,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg,project,client }].slice(-3)); setCompareOpen(true); };
+  const addToCompare = ()=>{ saveCompare([...compareSet,{ mode,productId,pitch,cabIndex,orientation,widthFt,heightFt,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg,project,client }].slice(-3)); setCompareOpen(true); };
   const removeCompare = (i)=> saveCompare(compareSet.filter((_,j)=>j!==i));
 
   // ----- share helpers -----
   const buildShareLink = ()=>{
     const p = new URLSearchParams({
-      mode, product:productId, w:widthFt, h:heightFt, p:pitch, cab:cabIndex,
+      mode, product:productId, w:widthFt, h:heightFt, p:pitch, cab:cabIndex, o:orientation, mcab:manualCab, ft:fitMode,
       cm:curveMode, pr:preset, sag:sagittaMm, rad:radiusMm, ct:curveType, cw:cabWeightKg,
     });
     if(project) p.set("proj",project);
@@ -794,15 +820,31 @@ function App(){
                   </div>
                 </Field>
               </div>
-              {product.cabinets.length>1&&(
-                <div style={{marginTop:12}}>
-                  <Field label="Cabinet">
-                    <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                      {product.cabinets.map((c,i)=><button key={i} onClick={()=>setCabIndex(i)} style={{padding:"7px 11px",background:cabIndex===i?C.purple:C.navy,border:`1px solid ${cabIndex===i?C.purple:C.line}`,borderRadius:8,color:C.cream,fontSize:10,fontWeight:600,cursor:"pointer",fontFamily:MO}}>{c.label}</button>)}
+              <div style={{marginTop:12}}>
+                <Field label="Cabinet" hint={manualCab?"manual override":"auto-picked best fit"}>
+                  {!manualCab ? (
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 12px",background:C.navy,border:`1px solid ${C.line}`,borderRadius:8}}>
+                      <div>
+                        <span style={{color:C.green,fontWeight:700,letterSpacing:1,fontSize:10,marginRight:8}}>AUTO</span>
+                        <span style={{fontFamily:MO,fontSize:13,color:C.cream}}>{result.cabW}×{result.cabH}mm</span>
+                        {orientation==="rotated" && <span style={{marginLeft:6,fontSize:9,color:C.amber,fontWeight:700,letterSpacing:1}}>↺ ROT</span>}
+                      </div>
+                      <button onClick={()=>setManualCab(true)} style={{fontSize:10,padding:"4px 10px",background:"transparent",border:`1px solid ${C.line}`,color:C.lavender,borderRadius:6,cursor:"pointer"}}>Manual</button>
                     </div>
-                  </Field>
-                </div>
-              )}
+                  ) : (<>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                      {product.cabinets.map((c,i)=><button key={i} onClick={()=>{setCabIndex(i);setOrientation("native");}} style={{padding:"7px 11px",background:cabIndex===i?C.purple:C.navy,border:`1px solid ${cabIndex===i?C.purple:C.line}`,borderRadius:8,color:C.cream,fontSize:10,fontWeight:600,cursor:"pointer",fontFamily:MO}}>{c.label}</button>)}
+                    </div>
+                    {(()=>{ const cur=product.cabinets[cabIndex]; if(!cur||cur.w===cur.h) return null; return (
+                      <div style={{display:"flex",gap:6,marginTop:8}}>
+                        <button onClick={()=>setOrientation("native")} style={{flex:1,padding:"6px 10px",background:orientation==="native"?C.purple:C.navy,border:`1px solid ${orientation==="native"?C.purple:C.line}`,borderRadius:8,color:C.cream,fontSize:10,fontWeight:600,cursor:"pointer",fontFamily:MO}}>Native {cur.w}×{cur.h}</button>
+                        <button onClick={()=>setOrientation("rotated")} style={{flex:1,padding:"6px 10px",background:orientation==="rotated"?C.purple:C.navy,border:`1px solid ${orientation==="rotated"?C.purple:C.line}`,borderRadius:8,color:C.cream,fontSize:10,fontWeight:600,cursor:"pointer",fontFamily:MO}}>↺ Rotated {cur.h}×{cur.w}</button>
+                      </div>
+                    );})()}
+                    <button onClick={()=>setManualCab(false)} style={{marginTop:8,fontSize:10,padding:"4px 10px",background:"transparent",border:`1px solid ${C.green}`,color:C.green,borderRadius:6,cursor:"pointer"}}>← Back to Auto</button>
+                  </>)}
+                </Field>
+              </div>
 
               <div style={{fontSize:10,letterSpacing:2,color:C.magenta,textTransform:"uppercase",fontWeight:700,margin:"22px 0 10px"}}>2 · Screen Size</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
@@ -839,6 +881,45 @@ function App(){
 
           {/* STAGE */}
           <div style={{display:"flex",flexDirection:"column",gap:16,minWidth:0}}>
+
+            {/* Smart fit cards — nearest vs optimal */}
+            {fits && (fits.nearest || fits.optimal) && (() => {
+              const pickFit = (which, fit) => {
+                if (!fit) return;
+                setFitMode(which);
+                setManualCab(false);
+                setCabIndex(fit.cabIndex);
+                setOrientation(fit.orientation);
+              };
+              const card = (which, fit, fitR, label, sub, rec) => {
+                if (!fit) return (
+                  <div style={{flex:1,padding:14,background:C.navyLight,border:`1px dashed ${C.line}`,borderRadius:12,color:C.lavender,opacity:.5,fontSize:12,textAlign:"center"}}>
+                    No nearest-smaller fit<br/><span style={{fontSize:10}}>(input is below any single cabinet)</span>
+                  </div>
+                );
+                const active = !manualCab && fitMode === which;
+                return (
+                  <button onClick={()=>pickFit(which,fit)} style={{flex:1,textAlign:"left",cursor:"pointer",padding:14,background:active?`linear-gradient(135deg,${C.navy} 0%,${C.purple}33 100%)`:C.navy,border:`1.5px solid ${active?C.magenta:C.line}`,borderRadius:12,color:C.cream,position:"relative",transition:"border-color .2s, background .2s",fontFamily:MN}}>
+                    {rec && <div style={{position:"absolute",top:-8,left:12,background:C.magenta,color:C.cream,fontSize:8.5,fontWeight:800,padding:"2px 8px",borderRadius:999,letterSpacing:1,textTransform:"uppercase"}}>Recommended</div>}
+                    <div style={{fontSize:9,letterSpacing:2,color:C.lavender,opacity:.7,textTransform:"uppercase",fontWeight:700}}>{label}</div>
+                    <div style={{fontFamily:MO,fontSize:12,color:C.amber,marginTop:4,fontWeight:600}}>{fit.cabLabel} {fit.orientation==="rotated"?<span style={{color:C.magenta}}>↺ rot</span>:""}</div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginTop:6}}>
+                      <span style={{fontFamily:MO,fontSize:11,color:C.cream}}>{fit.cabCountW}×{fit.cabCountH} = {fit.cabCountW*fit.cabCountH} cab</span>
+                      <span style={{fontFamily:MO,fontSize:11,color:C.lavender}}>{(fit.builtWmm/304.8).toFixed(2)}×{(fit.builtHmm/304.8).toFixed(2)}ft</span>
+                    </div>
+                    <div style={{fontSize:8.5,color:C.lavender,opacity:.6,marginTop:2}}>{sub}</div>
+                    {fitR && <div style={{fontFamily:FR,fontSize:17,color:active?C.magenta:C.cream,marginTop:8,fontWeight:600}}>{E.fmtINR(fitR.grandTotal)}</div>}
+                  </button>
+                );
+              };
+              return (
+                <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+                  {card("nearest", fits.nearest, fitResults.nearest, "Nearest fit (≤ input)", `built smaller than ${(Number(widthFt)).toFixed(1)}×${(Number(heightFt)).toFixed(1)}ft`, false)}
+                  {card("optimal", fits.optimal, fitResults.optimal, "Optimal fit (≥ input)", `built ≥ your request`, true)}
+                </div>
+              );
+            })()}
+
             <div style={{position:"relative",borderRadius:16,overflow:"hidden",border:`1px solid ${C.line}`,background:C.navyLight}}>
               <div style={{position:"absolute",inset:0,background:`radial-gradient(circle at 50% 40%, ${C.magenta}22 0%, transparent 60%)`,pointerEvents:"none"}}/>
               <div style={{position:"relative",display:"flex",gap:8,padding:"14px 16px 0",flexWrap:"wrap"}}>

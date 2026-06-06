@@ -30,8 +30,8 @@ ok("mini controller tiers = 6", db.controllers.mini.length === 6);
 ok("micro controller tiers = 5", db.controllers.micro.length === 5);
 const outdoor = PQM.getProduct(db, "outdoor");
 ok("outdoor has 4 pitches", outdoor.pitches.length === 4);
-ok("outdoor has 3 cabinets", outdoor.cabinets.length === 3);
-ok("outdoor cabinet0 = 960x960", outdoor.cabinets[0].w === 960 && outdoor.cabinets[0].h === 960);
+ok("outdoor has 4 cabinets", outdoor.cabinets.length === 4);
+ok("outdoor cabinet1 = 960x960 (after 640 added)", outdoor.cabinets[1].w === 960 && outdoor.cabinets[1].h === 960);
 ok("outdoor module = 320x160", outdoor.moduleW === 320 && outdoor.moduleH === 160);
 ok("microled detected as micro", PQM.isMicro(PQM.getProduct(db, "microled")));
 
@@ -48,7 +48,7 @@ ok("install 500sqft = 150", PQM.installRate(db, 500) === 150);
 
 console.log("\n── 3 · FLAT quote (outdoor P4, 12×8 ft, 960² cab) ──");
 const flat = PQM.computeQuote(
-  { mode: "flat", productId: "outdoor", pitch: 4, widthFt: 12, heightFt: 8, cabIndex: 0 }, db);
+  { mode: "flat", productId: "outdoor", pitch: 4, widthFt: 12, heightFt: 8, cabIndex: 1 }, db);
 noNaN(flat, "flat");
 ok("cabCountW = 4", flat.cabCountW === 4, "got " + flat.cabCountW);
 ok("cabCountH = 3", flat.cabCountH === 3, "got " + flat.cabCountH);
@@ -69,7 +69,7 @@ console.log("     → built " + flat.builtWft.toFixed(1) + "×" + flat.builtHft.
 
 console.log("\n── 4 · CURVED quote (outdoor P4, 16×8 ft, signature, outer) ──");
 const curved = PQM.computeQuote(
-  { mode: "curved", productId: "outdoor", pitch: 4, widthFt: 16, heightFt: 8, cabIndex: 0,
+  { mode: "curved", productId: "outdoor", pitch: 4, widthFt: 16, heightFt: 8, cabIndex: 1,
     curveMode: "preset", preset: "signature", curveType: "outer", cabWeightKg: 14 }, db);
 noNaN(curved, "curved");
 ok("curve block present", !!curved.curve);
@@ -105,10 +105,40 @@ const tiny = PQM.computeQuote({ mode: "flat", productId: "microled", pitch: 1.25
 noNaN(tiny, "tiny");
 ok("tiny screen still ≥1 cabinet", tiny.cabCountW >= 1 && tiny.cabCountH >= 1);
 ok("tiny screen ≥1 port", tiny.ports >= 1);
-const big = PQM.computeQuote({ mode: "flat", productId: "outdoor", pitch: 6.67, widthFt: 60, heightFt: 30, cabIndex: 0 }, db);
+const big = PQM.computeQuote({ mode: "flat", productId: "outdoor", pitch: 6.67, widthFt: 60, heightFt: 30, cabIndex: 1 }, db);
 noNaN(big, "big");
 ok("big screen uses install 150 tier", big.lines[2].rate === 150);
 ok("quoteRef format VR-YYYY-####", /^VR-\d{4}-\d{4}$/.test(PQM.quoteRef()));
+
+console.log("\n── 7 · Smart fit-finder ──");
+const fits1 = PQM.findFits({ productId:"outdoor", widthFt:12, heightFt:8 }, db);
+ok("outdoor 12x8: optimal exists", !!fits1.optimal);
+ok("outdoor 12x8: nearest exists", !!fits1.nearest);
+ok("optimal waste <= nearest waste*2", fits1.optimal.waste <= fits1.nearest.waste*2 + 1, "opt "+fits1.optimal.waste.toFixed(0)+" near "+fits1.nearest.waste.toFixed(0));
+ok("optimal built >= requested W", fits1.optimal.builtWmm >= 12*304.8 - 0.01);
+ok("nearest built <= requested W", fits1.nearest.builtWmm <= 12*304.8 + 0.01);
+console.log("     → opt: cab " + fits1.optimal.cabLabel + " (" + fits1.optimal.orientation + "), " + fits1.optimal.cabCountW + "x" + fits1.optimal.cabCountH);
+console.log("     → near: cab " + fits1.nearest.cabLabel + " (" + fits1.nearest.orientation + "), " + fits1.nearest.cabCountW + "x" + fits1.nearest.cabCountH);
+
+// Force a case where rotation matters: input narrow + tall to make 960x1280 rotated potentially preferred
+const fits2 = PQM.findFits({ productId:"outdoor", widthFt:4.2, heightFt:6.3 }, db);
+ok("4.2x6.3: both fits returned", !!fits2.optimal && !!fits2.nearest);
+console.log("     → rotation-test opt: " + fits2.optimal.cabLabel + " (" + fits2.optimal.orientation + "), built " + fits2.optimal.builtWmm + "x" + fits2.optimal.builtHmm);
+
+// Tiny input → nearest may be null (no cabinet fits below)
+const fits3 = PQM.findFits({ productId:"outdoor", widthFt:0.5, heightFt:0.5 }, db);
+ok("tiny 0.5x0.5: optimal still works", !!fits3.optimal);
+ok("tiny 0.5x0.5: nearest is null (below smallest)", fits3.nearest === null);
+
+// Rotation in computeQuote: square cabinet should be identical native vs rotated
+const rNat = PQM.computeQuote({ mode:"flat", productId:"outdoor", pitch:4, widthFt:12, heightFt:8, cabIndex:1, orientation:"native" }, db);
+const rRot = PQM.computeQuote({ mode:"flat", productId:"outdoor", pitch:4, widthFt:12, heightFt:8, cabIndex:1, orientation:"rotated" }, db);
+ok("square cab native==rotated (grand total)", rNat.grandTotal === rRot.grandTotal);
+
+// Non-square rotation actually swaps dims
+const a = PQM.computeQuote({ mode:"flat", productId:"outdoor", pitch:4, widthFt:12, heightFt:8, cabIndex:2, orientation:"native" }, db);
+const b = PQM.computeQuote({ mode:"flat", productId:"outdoor", pitch:4, widthFt:12, heightFt:8, cabIndex:2, orientation:"rotated" }, db);
+ok("non-square cab rotation changes built size", a.builtWmm !== b.builtWmm || a.builtHmm !== b.builtHmm);
 
 console.log("\n────────────────────────────");
 console.log(`  RESULT: ${pass} passed, ${fail} failed`);
