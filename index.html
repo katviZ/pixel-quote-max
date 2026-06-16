@@ -81,9 +81,12 @@
 </pixelData>
 </script>
 
-<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<!-- CDN versions PINNED — never use unpinned URLs on a deployed site.
+     Babel 8 broke the in-browser <script type="text/babel"> transform pattern;
+     locking to v7 keeps the JSX transform working as designed. -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js"></script>
 <script src="engine.js"></script>
 
 <script type="text/babel" data-presets="react">
