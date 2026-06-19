@@ -22,7 +22,7 @@ const xml = readFileSync(new URL("./pixel-data.xml", import.meta.url), "utf8");
 const db = PQM.parseDbXml(xml);
 
 console.log("\n── 1 · XML database parsing ──");
-ok("3 products parsed", db.products.length === 3, "got " + db.products.length);
+ok("4 products parsed (outdoor, indoor, cosmo, sapphire)", db.products.length === 4, "got " + db.products.length);
 ok("meta.curveSurchargePct = 15", db.meta.curveSurchargePct === 15);
 ok("meta.pixelsPerPortMini = 650000", db.meta.pixelsPerPortMini === 650000);
 ok("install tiers = 3", db.install.length === 3);
@@ -30,8 +30,8 @@ ok("mini controller tiers = 6", db.controllers.mini.length === 6);
 ok("micro controller tiers = 5", db.controllers.micro.length === 5);
 const outdoor = PQM.getProduct(db, "outdoor");
 ok("outdoor has 4 pitches", outdoor.pitches.length === 4);
-ok("outdoor has 4 cabinets", outdoor.cabinets.length === 4);
-ok("outdoor cabinet1 = 960x960 (after 640 added)", outdoor.cabinets[1].w === 960 && outdoor.cabinets[1].h === 960);
+ok("outdoor has 5 cabinets (module + 4)", outdoor.cabinets.length === 5);
+ok("outdoor cabinet2 = 960x960 (after 320×160 module & 640 added)", outdoor.cabinets[2].w === 960 && outdoor.cabinets[2].h === 960);
 ok("outdoor module = 320x160", outdoor.moduleW === 320 && outdoor.moduleH === 160);
 ok("microled detected as micro", PQM.isMicro(PQM.getProduct(db, "microled")));
 
@@ -48,7 +48,7 @@ ok("install 500sqft = 150", PQM.installRate(db, 500) === 150);
 
 console.log("\n── 3 · FLAT quote (outdoor P4, 12×8 ft, 960² cab) ──");
 const flat = PQM.computeQuote(
-  { mode: "flat", productId: "outdoor", pitch: 4, widthFt: 12, heightFt: 8, cabIndex: 1 }, db);
+  { mode: "flat", productId: "outdoor", pitch: 4, widthFt: 12, heightFt: 8, cabIndex: 2 }, db);
 noNaN(flat, "flat");
 ok("cabCountW = 4", flat.cabCountW === 4, "got " + flat.cabCountW);
 ok("cabCountH = 3", flat.cabCountH === 3, "got " + flat.cabCountH);
@@ -69,7 +69,7 @@ console.log("     → built " + flat.builtWft.toFixed(1) + "×" + flat.builtHft.
 
 console.log("\n── 4 · CURVED quote (outdoor P4, 16×8 ft, signature, outer) ──");
 const curved = PQM.computeQuote(
-  { mode: "curved", productId: "outdoor", pitch: 4, widthFt: 16, heightFt: 8, cabIndex: 1,
+  { mode: "curved", productId: "outdoor", pitch: 4, widthFt: 16, heightFt: 8, cabIndex: 2,
     curveMode: "preset", preset: "signature", curveType: "outer", cabWeightKg: 14 }, db);
 noNaN(curved, "curved");
 ok("curve block present", !!curved.curve);
@@ -105,7 +105,7 @@ const tiny = PQM.computeQuote({ mode: "flat", productId: "microled", pitch: 1.25
 noNaN(tiny, "tiny");
 ok("tiny screen still ≥1 cabinet", tiny.cabCountW >= 1 && tiny.cabCountH >= 1);
 ok("tiny screen ≥1 port", tiny.ports >= 1);
-const big = PQM.computeQuote({ mode: "flat", productId: "outdoor", pitch: 6.67, widthFt: 60, heightFt: 30, cabIndex: 1 }, db);
+const big = PQM.computeQuote({ mode: "flat", productId: "outdoor", pitch: 6.67, widthFt: 60, heightFt: 30, cabIndex: 2 }, db);
 noNaN(big, "big");
 ok("big screen uses install 150 tier", big.lines[2].rate === 150);
 ok("quoteRef format VR-YYYY-####", /^VR-\d{4}-\d{4}$/.test(PQM.quoteRef()));
@@ -135,13 +135,13 @@ const rNat = PQM.computeQuote({ mode:"flat", productId:"outdoor", pitch:4, width
 const rRot = PQM.computeQuote({ mode:"flat", productId:"outdoor", pitch:4, widthFt:12, heightFt:8, cabIndex:1, orientation:"rotated" }, db);
 ok("square cab native==rotated (grand total)", rNat.grandTotal === rRot.grandTotal);
 
-// Non-square rotation actually swaps dims
-const a = PQM.computeQuote({ mode:"flat", productId:"outdoor", pitch:4, widthFt:12, heightFt:8, cabIndex:2, orientation:"native" }, db);
-const b = PQM.computeQuote({ mode:"flat", productId:"outdoor", pitch:4, widthFt:12, heightFt:8, cabIndex:2, orientation:"rotated" }, db);
+// Non-square rotation actually swaps dims (960×1280 is now cab index 3)
+const a = PQM.computeQuote({ mode:"flat", productId:"outdoor", pitch:4, widthFt:12, heightFt:8, cabIndex:3, orientation:"native" }, db);
+const b = PQM.computeQuote({ mode:"flat", productId:"outdoor", pitch:4, widthFt:12, heightFt:8, cabIndex:3, orientation:"rotated" }, db);
 ok("non-square cab rotation changes built size", a.builtWmm !== b.builtWmm || a.builtHmm !== b.builtHmm);
 
 console.log("\n── 8 · Tech / power / weight derivatives ──");
-const tflat = PQM.computeQuote({ mode:"flat", productId:"outdoor", pitch:4, widthFt:12, heightFt:8, cabIndex:1 }, db);
+const tflat = PQM.computeQuote({ mode:"flat", productId:"outdoor", pitch:4, widthFt:12, heightFt:8, cabIndex:2 }, db);
 ok("diagonal > 0", tflat.diagInches > 0, "got "+tflat.diagInches);
 ok("aspect ratio is X:Y", /^\d+:\d+$/.test(tflat.aspectRatio), "got "+tflat.aspectRatio);
 ok("pixel density per sqm = 62,500 for P4", tflat.pixelDensitySqm === 62500, "got "+tflat.pixelDensitySqm);
