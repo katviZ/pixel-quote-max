@@ -291,6 +291,9 @@
 
     let bestOpt = null, bestNear = null;
     product.cabinets.forEach((cab, cabIndex) => {
+      // Module-based builds (modules-on-frame) are a deliberate construction
+      // choice — AUTO never picks them. User must select via Manual override.
+      if (cab.type === "module") return;
       const orientations = cab.w === cab.h ? ["native"] : ["native", "rotated"];
       orientations.forEach((orientation) => {
         const cw = orientation === "rotated" ? cab.h : cab.w;

@@ -55,6 +55,7 @@
              ipRating="IP65" maxPowerSqm="800" avgPowerSqm="500"
              warrantyYears="5" cabinetDepthMm="75" moduleDepthMm="16"
              lifespanHours="100000" opTempMin="-10" opTempMax="50" vdMultiplier="1.0">
+      <cabinet w="320"  h="160"  label="320×160mm Module" weight="1.5" type="module" />
       <cabinet w="640"  h="640"  label="640×640mm"   weight="8" />
       <cabinet w="960"  h="960"  label="960×960mm"   weight="14" />
       <cabinet w="960"  h="1280" label="960×1280mm"  weight="18" />
@@ -73,6 +74,7 @@
              ipRating="IP54" maxPowerSqm="400" avgPowerSqm="200"
              warrantyYears="2" cabinetDepthMm="80" moduleDepthMm="16"
              lifespanHours="100000" opTempMin="-10" opTempMax="50" vdMultiplier="1.0">
+      <cabinet w="320" h="160" label="320×160mm Module" weight="1.2" type="module" />
       <cabinet w="640" h="480" label="640×480mm" weight="6" />
       <cabinet w="640" h="640" label="640×640mm" weight="7" />
       <pitch pp="2.5"  rate="7500"  gst="18" sku="Reyansh Indoor P2.5" />
