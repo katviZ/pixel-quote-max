@@ -745,6 +745,7 @@ function App(){
   const [client,setClient]=useState(qDef("cl",sDef("client","")));
   const [exportFlash,setExportFlash]=useState(false);
   const [orientation,setOrientation]=useState(qDef("o",sDef("orientation","native"))==="rotated"?"rotated":"native");
+  const [moduleOrientation,setModuleOrientation]=useState(qDef("mo",sDef("moduleOrientation","native"))==="rotated"?"rotated":"native");
   const [manualCab,setManualCab]=useState(qDef("mcab",sDef("manualCab",false))===true||qDef("mcab",sDef("manualCab","false"))==="true");
   const [fitMode,setFitMode]=useState(qDef("ft",sDef("fitMode","optimal"))==="nearest"?"nearest":"optimal");
   const [historyOpen,setHistoryOpen]=useState(false);
@@ -755,8 +756,8 @@ function App(){
 
   // remember last-used inputs to restore on return
   useEffect(()=>{
-    try{ localStorage.setItem("pqm_session", JSON.stringify({ mode,product:productId,pitch,cabIndex,orientation,manualCab,fitMode,widthFt,heightFt,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg,project,client })); }catch{}
-  },[mode,productId,pitch,cabIndex,orientation,manualCab,fitMode,widthFt,heightFt,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg,project,client]);
+    try{ localStorage.setItem("pqm_session", JSON.stringify({ mode,product:productId,pitch,cabIndex,orientation,moduleOrientation,manualCab,fitMode,widthFt,heightFt,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg,project,client })); }catch{}
+  },[mode,productId,pitch,cabIndex,orientation,moduleOrientation,manualCab,fitMode,widthFt,heightFt,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg,project,client]);
 
   const acceptPolicy = ()=>{ try{ localStorage.setItem("pqm_agreed",POLICY_VERSION); }catch{} setAgreed(true); };
 
@@ -796,6 +797,12 @@ function App(){
     if(f.orientation !== orientation) setOrientation(f.orientation);
   },[fits,fitMode,manualCab]);
 
+  // module orientation override (currently exposed in UI only for indoor)
+  const moduleOverride = useMemo(()=>{
+    if(!product || moduleOrientation !== "rotated") return {};
+    return { moduleW: product.moduleH, moduleH: product.moduleW };
+  },[product, moduleOrientation]);
+
   const result = useMemo(()=>{
     if(!db||!product) return null;
     try{
@@ -804,18 +811,19 @@ function App(){
         widthFt:Number(widthFt)||0,heightFt:Number(heightFt)||0,cabIndex,orientation,
         curveMode,preset,sagittaMm:Number(sagittaMm)||0,radiusMm:Number(radiusMm)||0,
         curveType,cabWeightKg:Number(cabWeightKg)||14,
+        ...moduleOverride,
       },db);
     }catch(e){return null;}
-  },[db,product,mode,productId,pitch,widthFt,heightFt,cabIndex,orientation,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg]);
+  },[db,product,mode,productId,pitch,widthFt,heightFt,cabIndex,orientation,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg,moduleOverride]);
 
   const meta = useMemo(()=>({project,client,ref:E.quoteRef(),date:new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})}),[project,client,result]);
 
   const fitResults = useMemo(()=>{
     if(!db||!product||!fits) return { nearest:null, optimal:null };
-    const opts = { mode, productId, pitch, widthFt:Number(widthFt)||0, heightFt:Number(heightFt)||0, curveMode, preset, sagittaMm:Number(sagittaMm)||0, radiusMm:Number(radiusMm)||0, curveType, cabWeightKg:Number(cabWeightKg)||14 };
+    const opts = { mode, productId, pitch, widthFt:Number(widthFt)||0, heightFt:Number(heightFt)||0, curveMode, preset, sagittaMm:Number(sagittaMm)||0, radiusMm:Number(radiusMm)||0, curveType, cabWeightKg:Number(cabWeightKg)||14, ...moduleOverride };
     const safe = (f)=>{ if(!f) return null; try{ return E.computeQuote({...opts,cabIndex:f.cabIndex,orientation:f.orientation},db); }catch{ return null; } };
     return { nearest: safe(fits.nearest), optimal: safe(fits.optimal) };
-  },[db,product,fits,mode,pitch,widthFt,heightFt,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg]);
+  },[db,product,fits,mode,pitch,widthFt,heightFt,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg,moduleOverride]);
 
   // usage-policy gate — must accept to enter (QC/print contexts bypass)
   if(!agreed && Q.get("forceprint")!=="1" && Q.get("sheet")!=="1") return <Gate onAgree={acceptPolicy}/>;
@@ -850,13 +858,14 @@ function App(){
     const rec={ ref:meta.ref, date:meta.date, savedAt:new Date().toISOString(),
       series:result.product.series, sizeFt:`${result.builtWft.toFixed(1)}×${result.builtHft.toFixed(1)} ft`,
       grandTotal:result.grandTotal,
-      mode,productId,pitch,cabIndex,orientation,widthFt,heightFt,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg,project,client };
+      mode,productId,pitch,cabIndex,orientation,moduleOrientation,widthFt,heightFt,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg,project,client };
     saveHistory([rec, ...history.filter(h=>h.ref!==rec.ref)].slice(0,50));
   };
   const openQuote = (h)=>{
     setManualCab(true); // restoring exact config — disable auto-pick
     setMode(h.mode); setProductId(h.productId); setPitch(h.pitch); setCabIndex(h.cabIndex);
     setOrientation(h.orientation||"native");
+    setModuleOrientation(h.moduleOrientation||"native");
     setWidthFt(h.widthFt); setHeightFt(h.heightFt); setCurveMode(h.curveMode); setPreset(h.preset);
     setSagittaMm(h.sagittaMm); setRadiusMm(h.radiusMm); setCurveType(h.curveType); setCabWeightKg(h.cabWeightKg);
     setProject(h.project||""); setClient(h.client||""); setStageTab(h.mode==="curved"?"plan":"elevation");
@@ -866,13 +875,13 @@ function App(){
 
   // ----- comparison set -----
   const saveCompare = (arr)=>{ setCompareSet(arr); try{ localStorage.setItem("pqm_compare",JSON.stringify(arr)); }catch{} };
-  const addToCompare = ()=>{ saveCompare([...compareSet,{ mode,productId,pitch,cabIndex,orientation,widthFt,heightFt,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg,project,client }].slice(-3)); setCompareOpen(true); };
+  const addToCompare = ()=>{ saveCompare([...compareSet,{ mode,productId,pitch,cabIndex,orientation,moduleOrientation,widthFt,heightFt,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg,project,client }].slice(-3)); setCompareOpen(true); };
   const removeCompare = (i)=> saveCompare(compareSet.filter((_,j)=>j!==i));
 
   // ----- share helpers -----
   const buildShareLink = ()=>{
     const p = new URLSearchParams({
-      mode, product:productId, w:widthFt, h:heightFt, p:pitch, cab:cabIndex, o:orientation, mcab:manualCab, ft:fitMode,
+      mode, product:productId, w:widthFt, h:heightFt, p:pitch, cab:cabIndex, o:orientation, mo:moduleOrientation, mcab:manualCab, ft:fitMode,
       cm:curveMode, pr:preset, sag:sagittaMm, rad:radiusMm, ct:curveType, cw:cabWeightKg,
     });
     if(project) p.set("proj",project);
@@ -973,6 +982,17 @@ function App(){
                   </>)}
                 </Field>
               </div>
+
+              {productId==="indoor" && (
+                <div style={{marginTop:12}}>
+                  <Field label="Module" hint={moduleOrientation==="rotated"?"rotated layout (160×320 per module)":"native layout (320×160 per module)"}>
+                    <div style={{display:"flex",gap:6}}>
+                      <button onClick={()=>setModuleOrientation("native")} style={{flex:1,padding:"7px 10px",background:moduleOrientation==="native"?C.purple:C.navy,border:`1px solid ${moduleOrientation==="native"?C.purple:C.line}`,borderRadius:8,color:C.cream,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:MO}}>320 × 160</button>
+                      <button onClick={()=>setModuleOrientation("rotated")} style={{flex:1,padding:"7px 10px",background:moduleOrientation==="rotated"?C.purple:C.navy,border:`1px solid ${moduleOrientation==="rotated"?C.purple:C.line}`,borderRadius:8,color:C.cream,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:MO}}>↺ 160 × 320</button>
+                    </div>
+                  </Field>
+                </div>
+              )}
 
               <div style={{fontSize:10,letterSpacing:2,color:C.magenta,textTransform:"uppercase",fontWeight:700,margin:"22px 0 10px"}}>2 · Screen Size</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
