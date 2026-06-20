@@ -90,7 +90,6 @@
              ipRating="IP54" maxPowerSqm="350" avgPowerSqm="200"
              warrantyYears="3" cabinetDepthMm="45" moduleDepthMm="14"
              lifespanHours="100000" opTempMin="0" opTempMax="40" vdMultiplier="1.5">
-      <cabinet w="320" h="160" label="320×160mm Module" weight="1.0" type="module" />
       <cabinet w="640" h="480" label="640×480mm" weight="6" />
       <pitch pp="1.56" rate="23000" gst="28" sku="Leynna Cosmo P1.56" />
       <pitch pp="1.25" rate="25000" gst="28" sku="Leynna Cosmo P1.25" />
