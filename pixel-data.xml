@@ -82,7 +82,7 @@
       <pitch pp="1.56" rate="23000" gst="28" sku="Reyansh Indoor P1.56" />
     </product>
 
-    <product id="microled" series="Leynna Cosmo" type="MicroLED" env="indoor" moduleW="320" moduleH="160"
+    <product id="microled" series="Leynna Cosmo" type="MicroLED" env="indoor" moduleW="300" moduleH="168.75"
              displayTech="COB MicroLED" ledType="Tejas MicroLED · Flip Chip COB · 3-in-1 card"
              brightnessNits="800" refreshHz="3840" bitDepth="14"
              viewingAngleDeg="175" contrastStatic="10000" contrastDynamic="350000"
@@ -90,7 +90,8 @@
              ipRating="IP54" maxPowerSqm="350" avgPowerSqm="200"
              warrantyYears="3" cabinetDepthMm="45" moduleDepthMm="14"
              lifespanHours="100000" opTempMin="0" opTempMax="40" vdMultiplier="1.5">
-      <cabinet w="640" h="480" label="640×480mm" weight="6" />
+      <cabinet w="600"   h="337.5" label="600×337.5mm" weight="5" />
+      <cabinet w="609.6" h="342.9" label="609.6×342.9mm" weight="5" />
       <pitch pp="1.56" rate="23000" gst="28" sku="Leynna Cosmo P1.56" />
       <pitch pp="1.25" rate="25000" gst="28" sku="Leynna Cosmo P1.25" />
       <pitch pp="1.17" rate="23500" gst="28" sku="Leynna Cosmo P1.17" />
@@ -106,7 +107,8 @@
              ipRating="IP65" maxPowerSqm="380" avgPowerSqm="220"
              warrantyYears="3" cabinetDepthMm="44.5" moduleDepthMm="12"
              lifespanHours="100000" opTempMin="0" opTempMax="40" vdMultiplier="1.5">
-      <cabinet w="600" h="337.5" label="600×337.5mm" weight="5" />
+      <cabinet w="600"   h="337.5" label="600×337.5mm"   weight="5" />
+      <cabinet w="609.6" h="342.9" label="609.6×342.9mm" weight="5" />
       <pitch pp="1.53" rate="37800" gst="28" sku="Leynna Sapphire P1.53" />
       <pitch pp="1.23" rate="42000" gst="28" sku="Leynna Sapphire P1.23" />
       <pitch pp="0.95" rate="66000" gst="28" sku="Leynna Sapphire P0.95" />
