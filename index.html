@@ -124,8 +124,28 @@ function Field({label,unit,hint,children}){
   );
 }
 function NumInput({value,onChange,min,max,step=1}){
+  // clampInt UX (Phase 1): allow empty during typing; max-cap LIVE so a huge
+  // number can't spawn runaway geometry; min enforced only on blur so user
+  // can clear the field and retype a fresh value instead of fighting min=1.
+  const handleChange = (e)=>{
+    const v=e.target.value;
+    if(v==="") return onChange("");
+    const n=parseFloat(v);
+    if(!Number.isFinite(n)) return onChange("");
+    onChange(max!=null?Math.min(n,max):n);
+  };
+  const handleBlur = (e)=>{
+    const v=e.target.value;
+    if(v==="") return onChange(min??0);
+    const n=parseFloat(v);
+    if(!Number.isFinite(n)) return onChange(min??0);
+    let out=n;
+    if(max!=null) out=Math.min(out,max);
+    if(min!=null) out=Math.max(out,min);
+    onChange(out);
+  };
   return <input type="number" value={value} min={min} max={max} step={step}
-    onChange={(e)=>onChange(e.target.value===""?"":parseFloat(e.target.value))}
+    onChange={handleChange} onBlur={handleBlur}
     style={{background:C.navy,border:`1px solid ${C.line}`,color:C.cream,padding:"10px 12px",fontFamily:MO,fontSize:14,borderRadius:6,outline:"none",width:"100%"}} />;
 }
 function Pill({active,onClick,children}){
@@ -255,6 +275,331 @@ function SectionDrawing({sag,curveType}){
   );
 }
 
+/* ───────── 3D stage (Phase 2 — Three.js, lazy-loaded) ─────────
+   Loads three@0.149.0 from unpkg on first mount (UMD globals, no ESM
+   gymnastics — Babel-standalone can't import ESM cleanly). Caches the
+   load state on window so re-mount is instant. Curve geometry uses the
+   chord-radius approach: each cabinet is a flat chord of width cabW
+   sharing corner vertices with its neighbours — zero panel gap, mathematically
+   clean. Pivot is the common arc centre; per-cabinet rotation = arc tangent. */
+const THREE_VER = "0.147.0"; // last r1xx with UMD /examples/js/controls/OrbitControls.js — r148+ is ESM-only
+let __threeLoadPromise = null;
+function loadThree(){
+  if (window.THREE && window.THREE.OrbitControls) return Promise.resolve();
+  if (__threeLoadPromise) return __threeLoadPromise;
+  __threeLoadPromise = new Promise((resolve, reject) => {
+    const s1 = document.createElement("script");
+    s1.src = `https://unpkg.com/three@${THREE_VER}/build/three.min.js`;
+    s1.onload = () => {
+      const s2 = document.createElement("script");
+      s2.src = `https://unpkg.com/three@${THREE_VER}/examples/js/controls/OrbitControls.js`;
+      s2.onload = () => resolve();
+      s2.onerror = () => reject(new Error("OrbitControls failed to load"));
+      document.head.appendChild(s2);
+    };
+    s1.onerror = () => reject(new Error("Three.js failed to load"));
+    document.head.appendChild(s1);
+  });
+  return __threeLoadPromise;
+}
+
+function ThreeDStage({ result, mode }){
+  const mountRef = React.useRef(null);
+  const sceneRef = React.useRef(null);
+  const camRef = React.useRef(null);
+  const ctrlRef = React.useRef(null);
+  const rendererRef = React.useRef(null);
+  const groupRef = React.useRef(null);
+  const rafRef = React.useRef(null);
+  const [ready, setReady] = useState(!!(typeof window !== "undefined" && window.THREE && window.THREE.OrbitControls));
+  const [err, setErr] = useState(null);
+  const [wiringOn, setWiringOn] = useState(false);
+
+  // Lazy load Three.js on first mount
+  useEffect(()=>{
+    if (ready) return;
+    let alive = true;
+    loadThree().then(()=>{ if (alive) setReady(true); }).catch(e=>{ if (alive) setErr(e.message); });
+    return ()=>{ alive = false; };
+  }, []);
+
+  // Scene init (after Three.js loads)
+  useEffect(()=>{
+    if (!ready || !mountRef.current) return;
+    const THREE = window.THREE;
+    const mount = mountRef.current;
+    const w = mount.clientWidth, h = mount.clientHeight;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0d0d12); // PQM navyLight
+    sceneRef.current = scene;
+
+    const camera = new THREE.PerspectiveCamera(48, w/h, 0.1, 500);
+    camera.position.set(8, 4, 12);
+    camRef.current = camera;
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+    renderer.setSize(w, h);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    mount.appendChild(renderer.domElement);
+    rendererRef.current = renderer;
+    // Phase 3: expose canvas globally so PDF export + structural report can
+    // snapshot it (toDataURL). preserveDrawingBuffer above keeps the framebuffer
+    // readable after the next render — without it, toDataURL returns blank.
+    window.__pqm3dCanvas = renderer.domElement;
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.target.set(0, 1, 0);
+    ctrlRef.current = controls;
+
+    // Lights — soft fill + VR purple key
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const dl = new THREE.DirectionalLight(0xffffff, 0.7);
+    dl.position.set(5, 8, 5); scene.add(dl);
+    const dl2 = new THREE.DirectionalLight(0x9D20D6, 0.45); // VR brand purple
+    dl2.position.set(-5, 3, -5); scene.add(dl2);
+
+    // Stage floor + grid
+    scene.add(new THREE.GridHelper(30, 30, 0x252535, 0x1a1a24));
+    const gnd = new THREE.Mesh(
+      new THREE.PlaneGeometry(30, 30),
+      new THREE.MeshStandardMaterial({ color: 0x0a0a10, roughness: 0.95 })
+    );
+    gnd.rotation.x = -Math.PI/2; gnd.position.y = -0.01; scene.add(gnd);
+
+    const group = new THREE.Group();
+    scene.add(group);
+    groupRef.current = group;
+
+    const onResize = ()=>{
+      if (!mount) return;
+      const W = mount.clientWidth, H = mount.clientHeight;
+      camera.aspect = W/H; camera.updateProjectionMatrix();
+      renderer.setSize(W, H);
+    };
+    window.addEventListener("resize", onResize);
+
+    const animate = ()=>{ rafRef.current = requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); };
+    animate();
+
+    return ()=>{
+      window.removeEventListener("resize", onResize);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      try { controls.dispose(); } catch(e){}
+      try { renderer.dispose(); } catch(e){}
+      if (renderer.domElement && renderer.domElement.parentNode === mount) mount.removeChild(renderer.domElement);
+      if (window.__pqm3dCanvas === renderer.domElement) window.__pqm3dCanvas = null;
+      window.__pqm3dSnapshot = null;
+    };
+  }, [ready]);
+
+  // Build/rebuild wall when result, mode, or wiring changes
+  useEffect(()=>{
+    if (!ready || !groupRef.current || !result) return;
+    const THREE = window.THREE;
+    const group = groupRef.current;
+
+    // Dispose previous children
+    while (group.children.length) {
+      const c = group.children[0];
+      if (c.geometry) c.geometry.dispose();
+      if (c.material) Array.isArray(c.material) ? c.material.forEach(m=>m.dispose()) : c.material.dispose();
+      group.remove(c);
+    }
+
+    const cW = result.cabW / 1000, cH = result.cabH / 1000;
+    const cols = result.cabCountW, rows = result.cabCountH;
+    const wW = cols * cW, wH = rows * cH;
+
+    // Chord-radius curve geometry
+    const cv = result.curve;
+    const isCurved = mode === "curved" && cv && cv.cabAngleDeg > 0;
+    let curveSign = 0, dTheta = 0, angleRad = 0, curveRadius = 0;
+    if (isCurved) {
+      // outer (convex) curves away from viewer → +Z, inner (concave) curves toward → -Z
+      curveSign = cv.curveType === "outer" ? -1 : 1;
+      dTheta = (cv.cabAngleDeg * Math.PI) / 180;
+      angleRad = dTheta * cols;
+      curveRadius = cW / (2 * Math.sin(dTheta/2));
+    }
+    const vertX = (k)=> isCurved ? curveRadius * Math.sin(-angleRad/2 + k*dTheta) : 0;
+    const vertZ = (k)=> isCurved ? curveSign * curveRadius * (1 - Math.cos(-angleRad/2 + k*dTheta)) : 0;
+    const colX = (c)=> isCurved ? (vertX(c) + vertX(c+1))/2 : (c - (cols-1)/2) * cW;
+    const colZ = (c)=> isCurved ? (vertZ(c) + vertZ(c+1))/2 : 0;
+    const colAngle = (c)=> -angleRad/2 + (c+0.5)*dTheta;
+
+    // Materials
+    const steel = new THREE.MeshStandardMaterial({ color: 0x555570, roughness: 0.7, metalness: 0.6 });
+    const purple = new THREE.MeshStandardMaterial({ color: 0x9D20D6, roughness: 0.6, metalness: 0.7, emissive: 0x9D20D6, emissiveIntensity: 0.12 });
+    const t = Math.max(0.02, Math.min(0.04, wH * 0.012));
+
+    // Vertical supports — use result.nVerticalSupports from Phase 1 engine
+    const nV = Math.max(2, result.nVerticalSupports || 2);
+    for (let i = 0; i < nV; i++) {
+      const c = Math.round((i / Math.max(nV-1, 1)) * Math.max(cols-1, 1));
+      const bar = new THREE.Mesh(
+        new THREE.CylinderGeometry(t, t, wH + 0.3, 8),
+        i % 2 === 0 ? steel : purple
+      );
+      bar.position.set(colX(c), wH/2, colZ(c));
+      group.add(bar);
+    }
+
+    // Horizontal rails (top, mid, bottom)
+    for (let i = 0; i < 3; i++) {
+      const y = (i / 2) * wH;
+      const pts = [];
+      for (let c = 0; c < cols; c++) pts.push(new THREE.Vector3(colX(c), y, colZ(c)));
+      if (pts.length > 1) {
+        const path = new THREE.CatmullRomCurve3(pts);
+        const geo = new THREE.TubeGeometry(path, Math.max(8, cols*4), t, 6, false);
+        group.add(new THREE.Mesh(geo, i % 2 === 0 ? steel : purple));
+      } else {
+        // single-column case — straight bar across cabinet width
+        const bar = new THREE.Mesh(new THREE.CylinderGeometry(t, t, cW, 8), steel);
+        bar.rotation.z = Math.PI/2;
+        bar.position.set(0, y, 0);
+        group.add(bar);
+      }
+    }
+
+    // Cabinets — type-coloured
+    const isMicro = (result.product && result.product.type) === "MicroLED";
+    const cabColor = isMicro ? 0x3344AA : 0x227744;
+    const cabMat = new THREE.MeshStandardMaterial({ color: cabColor, roughness: 0.4, metalness: 0.3, emissive: cabColor, emissiveIntensity: 0.22 });
+    const edgeMat = new THREE.LineBasicMaterial({ color: 0xC89DD9, transparent: true, opacity: 0.55 });
+    const sd = 0.1;
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const x = colX(c), z = colZ(c), y = r * cH + cH/2;
+        const geo = new THREE.BoxGeometry(cW * 0.97, cH * 0.97, sd);
+        const mesh = new THREE.Mesh(geo, cabMat);
+        mesh.position.set(x, y, sd/2 + 0.02 + z);
+        if (isCurved) mesh.rotation.y = -curveSign * colAngle(c);
+        group.add(mesh);
+        const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat);
+        edges.position.copy(mesh.position);
+        edges.rotation.copy(mesh.rotation);
+        group.add(edges);
+      }
+    }
+
+    // Wiring (CAT6 cyan / Power orange / Earth gold)
+    if (wiringOn) {
+      // Cabinets sit centred at colZ + sd/2 + 0.02, so their front face is at
+      // colZ + sd + 0.02. Cable plane needs ≥ 0.06m extra clearance so the
+      // lines actually sit in FRONT of the panels (not buried inside them).
+      const faceZ = sd + 0.10;
+      const line = (pts, color)=> group.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(pts),
+        new THREE.LineBasicMaterial({ color })
+      ));
+      // CAT6 — daisy-chain per row
+      for (let r = 0; r < rows; r++) {
+        const y = r * cH + cH/2;
+        const pts = [];
+        for (let c = 0; c < cols; c++) pts.push(new THREE.Vector3(colX(c), y, colZ(c) + faceZ));
+        if (pts.length > 1) line(pts, 0x00D4FF);
+      }
+      // Power — top trunk + drop to each column
+      const top = [];
+      for (let c = 0; c < cols; c++) top.push(new THREE.Vector3(colX(c), wH + 0.15, colZ(c) + faceZ));
+      if (top.length > 1) line(top, 0xFF6B35);
+      for (let c = 0; c < cols; c++) line([
+        new THREE.Vector3(colX(c), wH + 0.15, colZ(c) + faceZ),
+        new THREE.Vector3(colX(c), 0, colZ(c) + faceZ)
+      ], 0xFF6B35);
+      // Earth — bottom bus
+      const bus = [];
+      for (let c = 0; c < cols; c++) bus.push(new THREE.Vector3(colX(c), -0.05, colZ(c) + faceZ));
+      if (bus.length > 1) line(bus, 0xFFD700);
+    }
+
+    // Auto-frame camera based on wall span
+    const span = Math.max(wW, wH, 2);
+    const dist = span * 1.6 + 3;
+    if (camRef.current && ctrlRef.current) {
+      camRef.current.position.set(dist * 0.55, wH/2 + Math.max(1, wH * 0.3), dist);
+      ctrlRef.current.target.set(0, wH/2, 0);
+      ctrlRef.current.update();
+    }
+
+    // Phase 3: expose a SNAPSHOT function that always captures from a
+    // straight-on, dead-centred camera — regardless of how the user has
+    // orbited the scene. Saves current camera state, moves to front-on,
+    // renders one frame, captures dataURL, then restores the user's view.
+    window.__pqm3dSnapshot = () => {
+      try {
+        const THREE = window.THREE;
+        const cam = camRef.current, ctrl = ctrlRef.current, rend = rendererRef.current, sc = sceneRef.current;
+        if (!cam || !ctrl || !rend || !sc || !THREE) return null;
+        // Save EVERYTHING — camera pos/target/aspect AND canvas size — because
+        // we forcibly resize the renderer below to guarantee a non-zero
+        // snapshot even when the 3D tab is hidden (display:none → canvas 0×0).
+        const savedPos = cam.position.clone();
+        const savedTarget = ctrl.target.clone();
+        const savedAspect = cam.aspect;
+        const savedSize = new THREE.Vector2();
+        rend.getSize(savedSize);
+        const SNAP_W = 1200, SNAP_H = 720;
+        rend.setSize(SNAP_W, SNAP_H, false);
+        cam.aspect = SNAP_W / SNAP_H;
+        cam.updateProjectionMatrix();
+        const snapDist = Math.max(wW, wH, 2) * 1.4 + 2;
+        cam.position.set(0, wH/2, snapDist);
+        ctrl.target.set(0, wH/2, 0);
+        ctrl.update();
+        rend.render(sc, cam);
+        const dataURL = rend.domElement.toDataURL("image/png");
+        // Restore everything so the visible 3D viewport doesn't jump
+        cam.position.copy(savedPos);
+        ctrl.target.copy(savedTarget);
+        cam.aspect = savedAspect;
+        cam.updateProjectionMatrix();
+        rend.setSize(savedSize.x || 1, savedSize.y || 1, false);
+        ctrl.update();
+        rend.render(sc, cam);
+        return dataURL;
+      } catch(e) { return null; }
+    };
+  }, [ready, result, mode, wiringOn]);
+
+  return (
+    <div style={{position:"relative",width:"100%",height:"min(60vh, 520px)",borderRadius:8,overflow:"hidden",background:"#0a0a10"}}>
+      <div ref={mountRef} style={{width:"100%",height:"100%"}}/>
+      {/* status overlays */}
+      {!ready && !err && (
+        <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",color:C.lavender,fontFamily:MO,fontSize:12,letterSpacing:1}}>Loading 3D engine…</div>
+      )}
+      {err && (
+        <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",color:"#ef4444",fontFamily:MO,fontSize:12,padding:20,textAlign:"center"}}>3D engine failed to load — {err}<br/>Check your connection and reload.</div>
+      )}
+      {/* wiring toggle */}
+      {ready && (
+        <button onClick={()=>setWiringOn(!wiringOn)}
+          style={{position:"absolute",top:12,right:12,padding:"8px 14px",background:wiringOn?C.magenta:"rgba(13,13,18,0.85)",color:C.cream,border:`1px solid ${wiringOn?C.magenta:C.line}`,borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:11,letterSpacing:.8,textTransform:"uppercase",backdropFilter:"blur(8px)"}}>
+          ⚡ {wiringOn ? "Wiring on" : "Wiring"}
+        </button>
+      )}
+      {/* wiring legend */}
+      {ready && wiringOn && (
+        <div style={{position:"absolute",bottom:12,left:12,background:"rgba(13,13,18,0.92)",border:`1px solid ${C.line}`,borderRadius:8,padding:"10px 14px",fontFamily:MO,fontSize:10,letterSpacing:.4,backdropFilter:"blur(8px)"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}><div style={{width:18,height:2,background:"#00D4FF",borderRadius:1}}/><span style={{color:C.cream}}>CAT6 data</span></div>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}><div style={{width:18,height:2,background:"#FF6B35",borderRadius:1}}/><span style={{color:C.cream}}>Power (3-core)</span></div>
+          <div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:18,height:2,background:"#FFD700",borderRadius:1}}/><span style={{color:C.cream}}>Earthing</span></div>
+        </div>
+      )}
+      {/* gesture hint */}
+      {ready && (
+        <div style={{position:"absolute",bottom:12,right:12,fontFamily:MO,fontSize:9,color:C.lavender,opacity:.55,letterSpacing:.5}}>drag to rotate · scroll to zoom · right-click to pan</div>
+      )}
+    </div>
+  );
+}
+
 /* ───────── price table ───────── */
 function PriceTable({r,paper}){
   const ink=paper?"#1A1208":C.cream, muted=paper?"#6B5E4A":C.lavender, bd=paper?"#E4DCCB":C.line;
@@ -276,7 +621,7 @@ function PriceTable({r,paper}){
 }
 
 /* ───────── print / PDF sheet ───────── */
-function PrintSheet({r,meta,preview}){
+function PrintSheet({r,meta,preview,threeDSnapshot}){
   if(!r) return null;
   const ink="#1A1208",muted="#6B5E4A",mg=C.magenta;
   const Row=({k,v,accent})=>(
@@ -324,6 +669,16 @@ function PrintSheet({r,meta,preview}){
         </div>
       )}
 
+      {/* Phase 3: 3D snapshot — embedded from Three.js canvas captured at export time. */}
+      {threeDSnapshot && (
+        <div className="avoid-break" style={{marginTop:14}}>
+          <SectionH>3D Reference</SectionH>
+          <div style={{border:"1px solid #E4DCCB",borderRadius:6,overflow:"hidden",background:"#0d0d12"}}>
+            <img src={threeDSnapshot} alt="3D screen reference" style={{width:"100%",display:"block"}}/>
+          </div>
+        </div>
+      )}
+
       {/* spec */}
       <div className="avoid-break" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginTop:6}}>
         <div>
@@ -355,18 +710,23 @@ function PrintSheet({r,meta,preview}){
       {/* Power & Weight — both modes */}
       <div className="avoid-break" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginTop:6}}>
         <div>
-          <SectionH>Power</SectionH>
-          <Row k="Avg power consumption" v={`${num(r.avgPowerW)} W (${num(r.avgPowerW/1000,2)} kW)`}/>
-          <Row k="Max power consumption" v={`${num(r.maxPowerW)} W (${num(r.maxPowerW/1000,2)} kW)`}/>
+          <SectionH>Power · Electrical</SectionH>
+          <Row k="Avg consumption" v={`${num(r.avgPowerW)} W · ${num(r.avgPowerW/1000,2)} kW`}/>
+          <Row k="Peak draw (×3, all-white)" v={`${num(r.peakPowerW)} W · ${num(r.peakPowerW/1000,2)} kW`}/>
+          <Row k="Peak current @ 220V" v={`${num(r.peakCurrentA,1)} A`}/>
+          <Row k="MCB rating (single-phase)" v={r.mcbRating} accent={mg}/>
           <Row k="Recommended supply" v={`${num(r.recommendedSupplyKw)} kW`} accent={mg}/>
-          <Row k="AC input" v="100-240V 50/60 Hz"/>
+          <Row k="AC input" v="100–240V · 50/60 Hz"/>
         </div>
         <div>
-          <SectionH>Weight</SectionH>
+          <SectionH>Weight · Structure</SectionH>
           <Row k="Per cabinet" v={`${num(r.perCabWeightKg,1)} kg`}/>
           <Row k="Screen weight (cabinets)" v={`${num(r.screenWeightKg)} kg`}/>
-          {r.curve && <Row k="Steel structure (est.)" v={`~${num(r.curve.steelWeightKg)} kg`}/>}
-          {r.curve && <Row k="Total system weight (est.)" v={`~${num(r.screenWeightKg + r.curve.steelWeightKg)} kg`} accent={mg}/>}
+          <Row k="Steel structure (est.)" v={`${num(r.structuralSteelKg)} kg`}/>
+          <Row k="Total system weight" v={`${num(r.totalSystemKg)} kg`} accent={mg}/>
+          <Row k="Vertical supports" v={`${r.nVerticalSupports} × ${r.tubeSpec}`}/>
+          <Row k="Load per support point" v={`${num(r.loadPerSupportKg,1)} kg`}/>
+          <Row k="Safety factor" v={`${num(r.safetyFactor,1)}×`} accent={r.safetyFactor>=2?"#34d399":r.safetyFactor>=1.5?"#fbbf24":"#ef4444"}/>
         </div>
       </div>
 
@@ -433,11 +793,12 @@ function PrintSheet({r,meta,preview}){
         © {new Date().getFullYear()} Visual Rhyme Pvt. Ltd. · Kathan Mehta · All rights reserved. This is a tool and can contain errors — verify before ordering.
       </div>
       <div style={{marginTop:6,textAlign:"right",fontSize:9,color:muted,opacity:.7,letterSpacing:.4,fontStyle:"italic"}}>
-        Powered by Microtronix Solution
+        Powered by Microtronix Solutions
       </div>
     </div>
   );
 }
+
 
 /* ───────── assistant (scripted, drives the tool, captures leads) ───────── */
 // Paste your Google Apps Script Web App URL here to send leads to your Sheet.
@@ -751,6 +1112,12 @@ function App(){
   const [project,setProject]=useState(qDef("proj",sDef("project","")));
   const [client,setClient]=useState(qDef("cl",sDef("client","")));
   const [exportFlash,setExportFlash]=useState(false);
+  // Phase 3: 3D canvas snapshot captured at PDF-export time, drawn into PrintSheet.
+  // Null when the user hasn't opened the 3D tab yet (snapshot skipped gracefully).
+  const [threeDSnapshot,setThreeDSnapshot]=useState(null);
+  // Phase 3 v3: latch — once the user (or an export) mounts the 3D scene, it
+  // stays mounted (hidden via display when not on 3D tab). Keeps snapshot alive.
+  const [mount3DEverActivated,setMount3DEverActivated]=useState(false);
   const [orientation,setOrientation]=useState(qDef("o",sDef("orientation","native"))==="rotated"?"rotated":"native");
   const [manualCab,setManualCab]=useState(qDef("mcab",sDef("manualCab",false))===true||qDef("mcab",sDef("manualCab","false"))==="true");
   const [fitMode,setFitMode]=useState(qDef("ft",sDef("fitMode","optimal"))==="nearest"?"nearest":"optimal");
@@ -791,8 +1158,12 @@ function App(){
 
   const fits = useMemo(()=>{
     if(!db||!product) return null;
-    try{ return E.findFits({ productId, widthFt:Number(widthFt)||0, heightFt:Number(heightFt)||0 }, db); }catch{ return null; }
-  },[db,product,productId,widthFt,heightFt]);
+    try{ return E.findFits({ productId, widthFt:Number(widthFt)||0, heightFt:Number(heightFt)||0,
+      // Phase 2 bugfix: lock the fit-finder to the chosen cabinet+orientation
+      // when user is in manual mode — so Nearest/Optimal cards reflect THEIR
+      // choice, not the algorithm's preferred-different cabinet.
+      manualCab, cabIndex, orientation }, db); }catch{ return null; }
+  },[db,product,productId,widthFt,heightFt,manualCab,cabIndex,orientation]);
 
   // auto-apply chosen fit to cabIndex+orientation (unless manual override)
   useEffect(()=>{
@@ -819,10 +1190,17 @@ function App(){
 
   const fitResults = useMemo(()=>{
     if(!db||!product||!fits) return { nearest:null, optimal:null };
-    const opts = { mode, productId, pitch, widthFt:Number(widthFt)||0, heightFt:Number(heightFt)||0, curveMode, preset, sagittaMm:Number(sagittaMm)||0, radiusMm:Number(radiusMm)||0, curveType, cabWeightKg:Number(cabWeightKg)||14 };
-    const safe = (f)=>{ if(!f) return null; try{ return E.computeQuote({...opts,cabIndex:f.cabIndex,orientation:f.orientation},db); }catch{ return null; } };
+    const opts = { mode, productId, pitch, curveMode, preset, sagittaMm:Number(sagittaMm)||0, radiusMm:Number(radiusMm)||0, curveType, cabWeightKg:Number(cabWeightKg)||14 };
+    // Phase 2 bugfix: price each fit at ITS OWN built dimensions, not the
+    // user's input widthFt/heightFt. Previously both nearest & optimal used
+    // the same user input → identical rounded-up quotes → both cards showed
+    // the same ₹. Now Nearest reflects round-DOWN savings, Optimal reflects
+    // round-UP cover — each card's price is the HONEST cost for that fit.
+    const safe = (f)=>{ if(!f) return null; try{ return E.computeQuote({...opts,
+      widthFt: f.builtWmm/304.8, heightFt: f.builtHmm/304.8,
+      cabIndex:f.cabIndex, orientation:f.orientation},db); }catch{ return null; } };
     return { nearest: safe(fits.nearest), optimal: safe(fits.optimal) };
-  },[db,product,fits,mode,pitch,widthFt,heightFt,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg]);
+  },[db,product,fits,mode,pitch,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg]);
 
   // usage-policy gate — must accept to enter (QC/print contexts bypass)
   if(!agreed && Q.get("forceprint")!=="1" && Q.get("sheet")!=="1") return <Gate onAgree={acceptPolicy}/>;
@@ -841,7 +1219,7 @@ function App(){
   const cv=result.curve;
   const valid = (Number(widthFt)>0 && Number(heightFt)>0);
 
-  const stageTabs = mode==="curved" ? [{k:"plan",l:"Plan"},{k:"elevation",l:"Elevation"},{k:"section",l:"Section"}] : [{k:"elevation",l:"Elevation"}];
+  const stageTabs = mode==="curved" ? [{k:"plan",l:"Plan"},{k:"elevation",l:"Elevation"},{k:"section",l:"Section"},{k:"3d",l:"3D"}] : [{k:"elevation",l:"Elevation"},{k:"3d",l:"3D"}];
   const presets=[{key:"subtle",l:"Subtle",d:"R = 5× width"},{key:"signature",l:"Signature",d:"R = 2.5× width"},{key:"wrap",l:"Wrap",d:"R = 1.3× width"},{key:"cylinder",l:"Cylinder",d:"R = 0.8× width"}];
 
   const assistantApi = {
@@ -860,6 +1238,161 @@ function App(){
       mode,productId,pitch,cabIndex,orientation,widthFt,heightFt,curveMode,preset,sagittaMm,radiusMm,curveType,cabWeightKg,project,client };
     saveHistory([rec, ...history.filter(h=>h.ref!==rec.ref)].slice(0,50));
   };
+
+  // Phase 3: shared snapshot grabber — uses ThreeDStage's straight-on snapshot
+  // function (camera saved → centred → render → capture → restored) so the
+  // exported image is ALWAYS front-on, regardless of how the user orbited.
+  // Falls back to plain canvas grab if the snapshot function isn't installed.
+  const grab3DSnapshot = ()=>{
+    try {
+      if (typeof window.__pqm3dSnapshot === "function") return window.__pqm3dSnapshot();
+      const cv = window.__pqm3dCanvas;
+      if (cv && cv.width > 0) return cv.toDataURL("image/png");
+    } catch(e) {}
+    return null;
+  };
+  // Phase 3 v3: ensures a snapshot is available before export. If 3D was never
+  // mounted (no snapshot fn), latches it on and polls until the scene renders
+  // (Three.js CDN load + WebGL init + buildWall). Caps at ~3s so the export
+  // never hangs forever. ThreeDStage stays mounted afterwards — subsequent
+  // exports get instant snapshots.
+  const ensureSnapshot = async ()=>{
+    let snap = grab3DSnapshot();
+    if (snap) return snap;
+    setMount3DEverActivated(true);
+    for (let i = 0; i < 30; i++) {
+      await new Promise(r => setTimeout(r, 100));
+      snap = grab3DSnapshot();
+      if (snap) return snap;
+    }
+    return null; // timed out; export proceeds without 3D image (graceful)
+  };
+
+  // Quote PDF export — async-awaits a snapshot (auto-mounts 3D if needed),
+  // then sets state and triggers window.print after React commits.
+  const doExportPdf = async ()=>{
+    recordQuote();
+    const snap = await ensureSnapshot();
+    setThreeDSnapshot(snap);
+    setTimeout(()=>{ window.print(); setTimeout(()=>setThreeDSnapshot(null), 1500); }, 250);
+  };
+
+  // Structural Report PDF — opens a dedicated print window with self-contained
+  // HTML + auto-print. More reliable than swapping the main App's PrintSheet
+  // via state (which races against window.print's DOM snapshot timing).
+  // Browser's "Save as PDF" works inside the new window.
+  const exportStructural = async ()=>{
+    if (!result) return;
+    const r = result, cv = r.curve;
+    const snapURL = await ensureSnapshot();
+    const sfColor = r.safetyFactor>=2 ? "#0E7F4F" : r.safetyFactor>=1.5 ? "#B45309" : "#B91C1C";
+    const dateStr = new Date().toLocaleDateString("en-IN",{day:"numeric",month:"long",year:"numeric"});
+    const alerts = [];
+    if (r.totalSystemKg > 1500) alerts.push({lvl:"danger",msg:`Heavy load: ${r.totalSystemKg} kg — independent structural review required before install.`});
+    else if (r.totalSystemKg > 800) alerts.push({lvl:"warning",msg:`Moderate load: ${r.totalSystemKg} kg — verify mounting structure is rated for this.`});
+    if (r.loadPerSupportKg > 80) alerts.push({lvl:"warning",msg:`Load per support point ${r.loadPerSupportKg.toFixed(1)} kg is high — consider increasing vertical supports.`});
+    if (r.safetyFactor < 1.5) alerts.push({lvl:"danger",msg:`Safety factor ${r.safetyFactor.toFixed(1)}× is BELOW comfort zone — upgrade tube spec or add supports.`});
+    else if (r.safetyFactor < 2) alerts.push({lvl:"warning",msg:`Safety factor ${r.safetyFactor.toFixed(1)}× is borderline — comfort zone is ≥ 2×.`});
+    if (r.peakPowerW > 10000) alerts.push({lvl:"info",msg:`Peak draw ${(r.peakPowerW/1000).toFixed(1)} kW — three-phase supply recommended.`});
+    if (alerts.length === 0) alerts.push({lvl:"success",msg:"All structural & electrical parameters within safe operating limits."});
+    const alertHTML = alerts.map(a=>`<div class="alert ${a.lvl}">${a.msg}</div>`).join("");
+    const snapImg = snapURL ? `<h2>3D Reference</h2><div class="threeD"><img src="${snapURL}"/></div>` : "";
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${(project||"VR")} — Structural Report</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;padding:32px 36px;color:#1a1a2e;background:#fafafa;font-size:13px;line-height:1.45;max-width:820px;margin:0 auto}
+h1{font-size:30px;font-weight:800;background:linear-gradient(135deg,#793494,#9D20D6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-0.5px;line-height:1}
+h2{font-size:11px;font-weight:800;color:#793494;margin:20px 0 10px;border-bottom:2px solid #E9D5FF;padding-bottom:6px;letter-spacing:1.5px;text-transform:uppercase}
+.sub{font-size:10px;color:#71717A;letter-spacing:2.5px;text-transform:uppercase;margin-top:6px;font-weight:700}
+.head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #E4DCCB;padding-bottom:14px;margin-bottom:14px}
+.refbox{text-align:right;font-size:11px;color:#71717A;font-family:'JetBrains Mono',monospace}
+.meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;padding:14px 18px;background:#fff;border-radius:10px;border:1px solid #e5e7eb;margin-bottom:6px}
+.meta .lbl{font-size:9px;color:#71717A;text-transform:uppercase;letter-spacing:1.2px;font-weight:700}
+.meta .val{font-size:13px;font-weight:600;margin-top:3px;color:#1a1a2e}
+.badge{padding:2px 9px;border-radius:14px;background:#F3E8FF;color:#9D20D6;font-size:10px;font-weight:700}
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;margin-bottom:6px}
+th{padding:7px 10px;background:#09090B;color:#fff;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;text-align:left}
+td{padding:8px 10px;font-size:12px;font-family:'JetBrains Mono',monospace}
+.col2{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:4px}
+.kv{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #E4DCCB;font-size:12px}
+.kv .k{color:#6B5E4A}
+.kv .v{font-family:'JetBrains Mono',monospace;font-weight:600;color:#1a1a2e}
+.kv.accent .v{color:#9D20D6}
+.kv.sf .v{color:${sfColor}}
+.alert{padding:10px 14px;border-radius:8px;font-size:12px;margin:6px 0;font-weight:500;border-left:3px solid}
+.alert.success{background:#ECFDF5;border-left-color:#10B981;color:#065F46}
+.alert.warning{background:#FFFBEB;border-left-color:#F59E0B;color:#92400E}
+.alert.danger{background:#FEF2F2;border-left-color:#EF4444;color:#991B1B}
+.alert.info{background:#EFF6FF;border-left-color:#3B82F6;color:#1E40AF}
+.threeD{border:1px solid #E4DCCB;border-radius:8px;overflow:hidden;background:#0d0d12}
+.threeD img{width:100%;display:block}
+.footer{margin-top:28px;text-align:center;font-size:11px;color:#9CA3AF;border-top:1px solid #e5e7eb;padding-top:16px}
+.brand{font-size:17px;font-weight:700;background:linear-gradient(135deg,#793494,#9D20D6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}
+@page{size:A4 portrait;margin:13mm}
+@media print{body{background:#fff;padding:0;max-width:none}.alert,table,.meta,.threeD{break-inside:avoid}h2{break-after:avoid}}
+</style></head><body>
+<div class="head">
+  <div>
+    <h1>Visual Rhyme</h1>
+    <div class="sub">Structural &amp; Load Specification Report</div>
+  </div>
+  <div class="refbox"><div>${meta.ref}</div><div>${dateStr}</div></div>
+</div>
+<div class="meta">
+  <div><div class="lbl">Client</div><div class="val">${client||"—"}</div></div>
+  <div><div class="lbl">Project</div><div class="val">${project||"—"}</div></div>
+  <div><div class="lbl">Series</div><div class="val"><span class="badge">${r.product.series}</span></div></div>
+</div>
+<h2>Product</h2>
+<table><thead><tr><th>Pitch</th><th>Cabinet</th><th>Type</th><th>IP</th><th>Brightness</th></tr></thead>
+<tbody><tr><td>P${r.pitch}</td><td>${r.cab.label}</td><td>${r.product.type}</td><td>${r.tech.ipRating||"—"}</td><td>${r.tech.brightnessNits||"—"} nits</td></tr></tbody></table>
+<h2>Dimensions</h2>
+<table><thead><tr><th>Width</th><th>Height</th><th>Diagonal</th><th>Area</th><th>Cabinets</th></tr></thead>
+<tbody><tr><td>${r.builtWmm.toFixed(0)} mm · ${r.builtWft.toFixed(2)} ft</td><td>${r.builtHmm.toFixed(0)} mm · ${r.builtHft.toFixed(2)} ft</td><td>${r.diagInches.toFixed(1)}″</td><td>${r.areaSqft.toFixed(1)} sqft</td><td>${r.cabCountW}×${r.cabCountH} = ${r.totalCabs}</td></tr></tbody></table>
+<div class="col2">
+  <div>
+    <h2>Weight &amp; Structure</h2>
+    <div class="kv"><span class="k">Per cabinet</span><span class="v">${r.perCabWeightKg} kg</span></div>
+    <div class="kv"><span class="k">Screen weight (cabinets)</span><span class="v">${r.screenWeightKg} kg</span></div>
+    <div class="kv"><span class="k">Steel structure (est.)</span><span class="v">${r.structuralSteelKg} kg</span></div>
+    <div class="kv accent"><span class="k">Total system</span><span class="v">${r.totalSystemKg} kg</span></div>
+    <div class="kv"><span class="k">Vertical supports</span><span class="v">${r.nVerticalSupports}</span></div>
+    <div class="kv"><span class="k">Tube spec</span><span class="v">${r.tubeSpec}</span></div>
+    <div class="kv accent"><span class="k">Load per support</span><span class="v">${r.loadPerSupportKg.toFixed(1)} kg</span></div>
+    <div class="kv sf"><span class="k">Safety factor</span><span class="v">${r.safetyFactor.toFixed(1)}× (rated ${r.tubeWorkingLoadKg} kg/pt)</span></div>
+  </div>
+  <div>
+    <h2>Power &amp; Electrical</h2>
+    <div class="kv"><span class="k">Avg consumption</span><span class="v">${r.avgPowerW.toLocaleString()} W · ${(r.avgPowerW/1000).toFixed(2)} kW</span></div>
+    <div class="kv"><span class="k">Peak draw (×${r.peakFactor}, all-white)</span><span class="v">${r.peakPowerW.toLocaleString()} W · ${(r.peakPowerW/1000).toFixed(2)} kW</span></div>
+    <div class="kv"><span class="k">Peak current @ ${r.acVoltage} V</span><span class="v">${r.peakCurrentA.toFixed(1)} A</span></div>
+    <div class="kv accent"><span class="k">MCB rating (single-phase)</span><span class="v">${r.mcbRating}</span></div>
+    <div class="kv accent"><span class="k">Recommended supply</span><span class="v">${r.recommendedSupplyKw} kW</span></div>
+    <div class="kv"><span class="k">AC input</span><span class="v">100–240 V · 50/60 Hz</span></div>
+    <div class="kv"><span class="k">Controller ports</span><span class="v">${r.ports}</span></div>
+    ${cv?`<div class="kv"><span class="k">Curve radius</span><span class="v">${(cv.R/1000).toFixed(2)} m</span></div>`:""}
+    ${cv?`<div class="kv"><span class="k">Sagitta</span><span class="v">${cv.sag.toFixed(0)} mm</span></div>`:""}
+  </div>
+</div>
+<h2>Safety &amp; Recommendations</h2>
+${alertHTML}
+${snapImg}
+<div class="footer">
+  <div class="brand">Visual Rhyme Pvt. Ltd.</div>
+  <div>India's Pioneering MicroLED &amp; MiniLED Display Brand</div>
+  <div style="margin-top:5px">Generated by Pixel Quote Max · ${dateStr}</div>
+  <div style="margin-top:3px;font-size:10px">193, 9th Floor, Silver Radiance 4, off SG Highway, Gota, Ahmedabad — 382481</div>
+</div>
+<script>window.addEventListener("load",function(){setTimeout(function(){window.print();},300);});<\/script>
+</body></html>`;
+    const w = window.open("", "_blank");
+    if (!w) { alert("Please allow popups for Pixel Quote Max so the Structural PDF can open."); return; }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+  };
+
   const openQuote = (h)=>{
     setManualCab(true); // restoring exact config — disable auto-pick
     setMode(h.mode); setProductId(h.productId); setPitch(h.pitch); setCabIndex(h.cabIndex);
@@ -929,7 +1462,8 @@ function App(){
             style={{background:C.navyLight,border:`1px solid ${C.line}`,color:C.cream,padding:"9px 12px",fontFamily:MN,fontSize:13,borderRadius:8,outline:"none",width:150}}/>
           {compareSet.length>0 && <button onClick={()=>setCompareOpen(true)} style={headerBtn(false)}>⊞ Compare ({compareSet.length})</button>}
           <button onClick={()=>setHistoryOpen(true)} style={headerBtn(false)}>🕘 History{history.length?` (${history.length})`:""}</button>
-          <button onClick={()=>{recordQuote();window.print();}} disabled={!valid} style={{...headerBtn(false),background:C.purple,borderColor:exportFlash?C.amber:C.purple,color:C.cream,opacity:valid?1:.5,boxShadow:exportFlash?`0 0 0 3px ${C.amber}, 0 0 22px ${C.amber}`:"none",transition:"box-shadow .3s, border-color .3s"}}>⤓ Export PDF</button>
+          <button onClick={exportStructural} disabled={!valid} title="Fabricator/electrician PDF — load, MCB, safety factor, 3D reference (straight-on)" style={{...headerBtn(false),background:"transparent",borderColor:C.line,color:C.lavender,opacity:valid?1:.5}}>📐 Structural PDF</button>
+          <button onClick={doExportPdf} disabled={!valid} style={{...headerBtn(false),background:C.purple,borderColor:exportFlash?C.amber:C.purple,color:C.cream,opacity:valid?1:.5,boxShadow:exportFlash?`0 0 0 3px ${C.amber}, 0 0 22px ${C.amber}`:"none",transition:"box-shadow .3s, border-color .3s"}}>⤓ Export PDF</button>
         </div>
       </div>
 
@@ -1024,7 +1558,16 @@ function App(){
               const pickFit = (which, fit) => {
                 if (!fit) return;
                 setFitMode(which);
-                setManualCab(false);
+                // Phase 2 bugfix: clicking a fit card ACCEPTS that fit — push
+                // width/height to the fit's built dimensions so the rail quote
+                // matches the card. Cabinet+orientation update too. Do NOT
+                // flip manualCab — preserve the user's current mode. (With the
+                // findFits manual-mode lock from this turn, fit.cabIndex /
+                // fit.orientation already equal the user's choice in manual
+                // mode, so this is a no-op there. In auto mode, it accepts
+                // the algorithm's pick as the user always expected.)
+                setWidthFt(+(fit.builtWmm / 304.8).toFixed(2));
+                setHeightFt(+(fit.builtHmm / 304.8).toFixed(2));
                 setCabIndex(fit.cabIndex);
                 setOrientation(fit.orientation);
               };
@@ -1060,14 +1603,25 @@ function App(){
             <div style={{position:"relative",borderRadius:16,overflow:"hidden",border:`1px solid ${C.line}`,background:C.navyLight}}>
               <div style={{position:"absolute",inset:0,background:`radial-gradient(circle at 50% 40%, ${C.magenta}22 0%, transparent 60%)`,pointerEvents:"none"}}/>
               <div style={{position:"relative",display:"flex",gap:8,padding:"14px 16px 0",flexWrap:"wrap"}}>
-                {stageTabs.map(t=><button key={t.k} onClick={()=>setStageTab(t.k)} style={headerBtn(stageTab===t.k)}>{t.l}</button>)}
+                {stageTabs.map(t=><button key={t.k} onClick={()=>{setStageTab(t.k); if(t.k==="3d") setMount3DEverActivated(true);}} style={headerBtn(stageTab===t.k)}>{t.l}</button>)}
                 <div style={{marginLeft:"auto",alignSelf:"center",fontFamily:MO,fontSize:11,color:C.lavender,opacity:.7}}>{mode==="curved"?(curveType==="outer"?"OUTER · CONVEX":"INNER · CONCAVE"):"FLAT PANEL"}</div>
               </div>
-              <div key={mode+"-"+stageTab} className="vr-fade" style={{position:"relative",padding:16}}>
-                {stageTab==="elevation"&&<ElevationDrawing wmm={result.builtWmm} hmm={result.builtHmm} cabCountW={result.cabCountW} cabCountH={result.cabCountH} modPerCabW={result.modPerCabW} modPerCabH={result.modPerCabH}/>}
-                {stageTab==="plan"&&cv&&<PlanDrawing chord={cv.chordMm} R={cv.R} sag={cv.sag} cabCountW={result.cabCountW} curveType={cv.curveType}/>}
-                {stageTab==="section"&&cv&&<div style={{maxWidth:380,margin:"0 auto"}}><SectionDrawing sag={cv.sag} curveType={cv.curveType}/></div>}
-              </div>
+              {stageTab !== "3d" && (
+                <div key={mode+"-"+stageTab} className="vr-fade" style={{position:"relative",padding:16}}>
+                  {stageTab==="elevation"&&<ElevationDrawing wmm={result.builtWmm} hmm={result.builtHmm} cabCountW={result.cabCountW} cabCountH={result.cabCountH} modPerCabW={result.modPerCabW} modPerCabH={result.modPerCabH}/>}
+                  {stageTab==="plan"&&cv&&<PlanDrawing chord={cv.chordMm} R={cv.R} sag={cv.sag} cabCountW={result.cabCountW} curveType={cv.curveType}/>}
+                  {stageTab==="section"&&cv&&<div style={{maxWidth:380,margin:"0 auto"}}><SectionDrawing sag={cv.sag} curveType={cv.curveType}/></div>}
+                </div>
+              )}
+              {/* Phase 3 v3 bugfix: once mounted, ThreeDStage stays mounted —
+                  hidden via display when not on 3D tab. Keeps the snapshot
+                  function alive so Export PDF / Structural PDF always have
+                  a 3D image available, even if user switches away from the tab. */}
+              {mount3DEverActivated && (
+                <div style={{padding:16, display: stageTab==="3d" ? "block" : "none"}}>
+                  <ThreeDStage result={result} mode={mode}/>
+                </div>
+              )}
             </div>
 
             {mode==="curved"&&cv&&(
@@ -1123,7 +1677,8 @@ function App(){
               <Metric label="Diagonal · Aspect" value={`${num(result.diagInches,1)}″ · ${result.aspectRatio}`} sub={`${num(result.pixelDensitySqm)} px/sqm · min view ${num(result.minViewingDistanceM,1)} m`}/>
               <Metric label="Active area" value={num(result.areaSqft,1)} unit="sqft" sub={`${result.ports} controller port(s)`}/>
               <Metric label="Brightness · Refresh" value={`${num(result.tech.brightnessNits)} nits · ${num(result.tech.refreshHz)} Hz`} sub={`${result.tech.displayTech||""} · ${result.tech.ipRating||""}`}/>
-              <Metric label="Weight · Supply" value={`${num(result.screenWeightKg)} kg · ${num(result.recommendedSupplyKw)} kW`} sub={`avg ${num(result.avgPowerW/1000,2)} kW · max ${num(result.maxPowerW/1000,2)} kW`}/>
+              <Metric label="Power · MCB" value={`${result.mcbRating} · ${num(result.peakCurrentA,1)}A`} accent={C.amber} sub={`peak ${num(result.peakPowerW/1000,2)} kW · avg ${num(result.avgPowerW/1000,2)} kW · supply ${num(result.recommendedSupplyKw)} kW`}/>
+              <Metric label="Load · Safety" value={`${num(result.loadPerSupportKg,1)} kg/pt · SF ${num(result.safetyFactor,1)}×`} accent={result.safetyFactor>=2?C.amber:"#ef4444"} sub={`${num(result.totalSystemKg)} kg total (${num(result.screenWeightKg)}+${num(result.structuralSteelKg)}) · ${result.nVerticalSupports} vertical supports · ${result.tubeSpec}`}/>
               {mode==="curved"&&cv&&(<>
                 <Metric label="Radius (R)" value={num(cv.R/1000,2)} unit="m" accent={C.amber} sub={`= ${num(cv.R,0)} mm`}/>
                 <Metric label={cv.curveType==="outer"?"Sagitta · cantilever":"Sagitta · depth"} value={num(cv.sag,0)} unit="mm" sub={`arc length ${num(cv.arcLen,0)} mm`}/>
@@ -1143,7 +1698,7 @@ function App(){
             <div style={{fontSize:10.5,color:C.lavender,opacity:.55,marginBottom:5}}>⚠ This is a tool — it can make mistakes. Verify every quote before sharing or ordering.</div>
             <div style={{fontFamily:MO,fontSize:10,color:C.lavender,opacity:.5,letterSpacing:1.2}}>© {new Date().getFullYear()} Visual Rhyme Pvt. Ltd. · Kathan Mehta · All rights reserved.</div>
           </div>
-          <div style={{position:"absolute",right:8,bottom:6,fontSize:9.5,color:C.lavender,opacity:.4,letterSpacing:.6,fontStyle:"italic"}}>Powered by Microtronix Solution</div>
+          <div style={{position:"absolute",right:8,bottom:6,fontSize:9.5,color:C.lavender,opacity:.4,letterSpacing:.6,fontStyle:"italic"}}>Powered by Microtronix Solutions</div>
         </div>
       </div>
 
@@ -1151,7 +1706,7 @@ function App(){
       {historyOpen && <HistoryPanel history={history} onOpen={openQuote} onDelete={deleteQuote} onClose={()=>setHistoryOpen(false)}/>}
       {compareOpen && <ComparePanel items={compareSet} db={db} onLoad={(cfg)=>{openQuote(cfg);setCompareOpen(false);}} onRemove={removeCompare} onClear={()=>saveCompare([])} onClose={()=>setCompareOpen(false)}/>}
     </div>
-    <PrintSheet r={result} meta={meta}/>
+    <PrintSheet r={result} meta={meta} threeDSnapshot={threeDSnapshot}/>
     </>
   );
 }

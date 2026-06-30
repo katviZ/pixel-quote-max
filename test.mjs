@@ -155,6 +155,61 @@ ok("tech.refreshHz = 3840", tflat.tech.refreshHz === 3840);
 ok("tech.ipRating = IP65", tflat.tech.ipRating === "IP65");
 console.log("     → outdoor P4 12x8: diag "+tflat.diagInches.toFixed(1)+"\", "+tflat.aspectRatio+", "+tflat.pixelDensitySqm+" px/sqm, "+tflat.screenWeightKg+"kg, "+tflat.recommendedSupplyKw+"kW supply");
 
+console.log("\n── 9 · Phase 1: peak power + MCB + structural ──");
+ok("peakPowerW = avgPowerW × 3", tflat.peakPowerW === tflat.avgPowerW * 3, "got "+tflat.peakPowerW+" vs "+(tflat.avgPowerW*3));
+ok("peakCurrentA = peakPowerW / 220 (1 dp)", Math.abs(tflat.peakCurrentA - tflat.peakPowerW/220) < 0.1);
+ok("mcbRating returns a string", typeof tflat.mcbRating === "string" && /\dA/.test(tflat.mcbRating));
+ok("nVerticalSupports ≥ 2 (from width ÷ 960 + 1)", tflat.nVerticalSupports >= 2);
+ok("structuralSteelKg > 0 (flat = 55% of screen)", tflat.structuralSteelKg > 0);
+ok("totalSystemKg = screen + steel", tflat.totalSystemKg === tflat.screenWeightKg + tflat.structuralSteelKg);
+ok("loadPerSupportKg > 0", tflat.loadPerSupportKg > 0);
+ok("safetyFactor > 0", tflat.safetyFactor > 0);
+ok("tubeSpec exposed", tflat.tubeSpec === "40mm OD × 2.5mm wall steel");
+ok("tubeWorkingLoadKg = 250", tflat.tubeWorkingLoadKg === 250);
+console.log("     → flat outdoor P4 12x8: peak "+tflat.peakPowerW+"W ("+tflat.peakCurrentA+"A → "+tflat.mcbRating+"), supports "+tflat.nVerticalSupports+", load/pt "+tflat.loadPerSupportKg+"kg, SF "+tflat.safetyFactor);
+
+// Curved screen reuses its OWN steelWeightKg (not the flat 55% estimate)
+const tcurved = PQM.computeQuote({ mode:"curved", productId:"outdoor", pitch:4, widthFt:16, heightFt:8, cabIndex:2, curveMode:"preset", preset:"signature", curveType:"outer", cabWeightKg:14 }, db);
+ok("curved structuralSteelKg matches curve.steelWeightKg", tcurved.structuralSteelKg === tcurved.curve.steelWeightKg);
+ok("curved loadPerSupportKg > 0", tcurved.loadPerSupportKg > 0);
+console.log("     → curved 16x8: steel "+tcurved.structuralSteelKg+"kg, load/pt "+tcurved.loadPerSupportKg+"kg, SF "+tcurved.safetyFactor+", "+tcurved.mcbRating);
+
+// MCB ladder spot-checks
+ok("currentToMCB(10) = 20A", PQM.currentToMCB(10) === "20A");
+ok("currentToMCB(20) = 32A", PQM.currentToMCB(20) === "32A");
+ok("currentToMCB(30) = 40A", PQM.currentToMCB(30) === "40A");
+ok("currentToMCB(55) → 3-phase", /3-phase/.test(PQM.currentToMCB(55)));
+
+console.log("\n── 10 · Phase 2 bugfix: findFits manual-mode lock ──");
+const cosmoAuto = PQM.findFits({ productId:"microled", widthFt:11, heightFt:8 }, db);
+const cosmoMan0N = PQM.findFits({ productId:"microled", widthFt:11, heightFt:8, manualCab:true, cabIndex:0, orientation:"native" }, db);
+const cosmoMan1R = PQM.findFits({ productId:"microled", widthFt:11, heightFt:8, manualCab:true, cabIndex:1, orientation:"rotated" }, db);
+ok("auto mode: optimal exists", !!(cosmoAuto && cosmoAuto.optimal));
+ok("manual cab=0/native: optimal locked to cabIndex 0", cosmoMan0N.optimal && cosmoMan0N.optimal.cabIndex === 0);
+ok("manual cab=0/native: optimal orientation = native", cosmoMan0N.optimal && cosmoMan0N.optimal.orientation === "native");
+ok("manual cab=0/native: nearest also locked", cosmoMan0N.nearest && cosmoMan0N.nearest.cabIndex === 0 && cosmoMan0N.nearest.orientation === "native");
+ok("manual cab=1/rotated: optimal locked to cabIndex 1, rotated", cosmoMan1R.optimal && cosmoMan1R.optimal.cabIndex === 1 && cosmoMan1R.optimal.orientation === "rotated");
+console.log("     → cosmo 11x8: auto picked "+cosmoAuto.optimal.cabLabel+"/"+cosmoAuto.optimal.orientation+" · manual locked cab0/native → "+cosmoMan0N.optimal.cabLabel+"/"+cosmoMan0N.optimal.orientation);
+
+// Card-price honesty: nearest vs optimal must produce DIFFERENT quotes when
+// they correspond to different built dimensions (round-down vs round-up).
+// This is the bug Katviz caught — both cards showed ₹35,69,240 because the
+// price was being computed against the user's input dims, not the fit's built dims.
+const nearFit = cosmoMan0N.nearest, optFit = cosmoMan0N.optimal;
+const qNear = PQM.computeQuote({ mode:"flat", productId:"microled", pitch:1.25,
+  widthFt:nearFit.builtWmm/304.8, heightFt:nearFit.builtHmm/304.8,
+  cabIndex:nearFit.cabIndex, orientation:nearFit.orientation, cabWeightKg:5 }, db);
+const qOpt = PQM.computeQuote({ mode:"flat", productId:"microled", pitch:1.25,
+  widthFt:optFit.builtWmm/304.8, heightFt:optFit.builtHmm/304.8,
+  cabIndex:optFit.cabIndex, orientation:optFit.orientation, cabWeightKg:5 }, db);
+ok("card prices DIFFER when nearest vs optimal have different cab counts",
+   qNear.grandTotal !== qOpt.grandTotal,
+   "near="+PQM.fmtINR(qNear.grandTotal)+" opt="+PQM.fmtINR(qOpt.grandTotal));
+ok("near quote built matches near fit", qNear.totalCabs === nearFit.cabCountW * nearFit.cabCountH);
+ok("opt quote built matches opt fit", qOpt.totalCabs === optFit.cabCountW * optFit.cabCountH,
+   "qOpt="+qOpt.totalCabs+" ("+qOpt.cabCountW+"×"+qOpt.cabCountH+") vs fit="+(optFit.cabCountW*optFit.cabCountH)+" ("+optFit.cabCountW+"×"+optFit.cabCountH+") builtMm="+optFit.builtWmm+"×"+optFit.builtHmm+" → ft "+(optFit.builtWmm/304.8).toFixed(8)+"×"+(optFit.builtHmm/304.8).toFixed(8));
+console.log("     → cosmo 11x8 manual cab0/native: nearest "+nearFit.cabCountW+"×"+nearFit.cabCountH+" = "+PQM.fmtINR(qNear.grandTotal)+" · optimal "+optFit.cabCountW+"×"+optFit.cabCountH+" = "+PQM.fmtINR(qOpt.grandTotal));
+
 console.log("\n────────────────────────────");
 console.log(`  RESULT: ${pass} passed, ${fail} failed`);
 console.log("────────────────────────────\n");

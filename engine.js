@@ -75,6 +75,19 @@
     return { rate: one.rate, gst: one.gst, sku: "Custom " + pp + "mm" };
   }
 
+  /* MCB sizing ladder — peak current A → recommended single-phase MCB rating.
+     Conservative, gives 25–60% headroom over peak draw at each tier.
+     Source: standard Indian Hager/L&T/Schneider single-phase residential MCB tiers
+     (BS EN 60898). Above 63A → industrial 3-phase territory; we cap there. */
+  function currentToMCB(amp) {
+    if (amp <= 16) return "20A";
+    if (amp <= 25) return "32A";
+    if (amp <= 32) return "40A";
+    if (amp <= 40) return "50A";
+    if (amp <= 50) return "63A";
+    return "63A · 3-phase recommended";
+  }
+
   function controllerPrice(db, ports, micro) {
     const tiers = micro ? db.controllers.micro : db.controllers.mini;
     const t = tiers.find((x) => ports <= x.maxPorts) || tiers[tiers.length - 1];
@@ -147,8 +160,11 @@
     const modW = rotated ? (params.moduleH || product.moduleH) : (params.moduleW || product.moduleW);
     const modH = rotated ? (params.moduleW || product.moduleW) : (params.moduleH || product.moduleH);
 
-    const reqWmm = ftToMm(params.widthFt);
-    const reqHmm = ftToMm(params.heightFt);
+    // Round to µm to kill float-drift from ft↔mm round-trips. (3600/304.8)×304.8
+    // in JS = 3600.0000000000005, which makes ceil() jump from 6 to 7 cabinets.
+    // 1µm tolerance is 1000× smaller than any physically meaningful spec.
+    const reqWmm = Math.round(ftToMm(params.widthFt) * 1000) / 1000;
+    const reqHmm = Math.round(ftToMm(params.heightFt) * 1000) / 1000;
 
     // snap UP to whole cabinets (you build & quote whole cabinets)
     const cabCountW = Math.max(1, Math.ceil(reqWmm / cabW));
@@ -185,10 +201,35 @@
       ? +params.cabWeightKg : (cab.weight != null ? cab.weight : (micro ? 5 : 14));
     const screenWeightKg = Math.round(totalCabs * perCabWeightKg);
 
-    // electrical (for BOTH flat & curved now)
+    // ---- electrical (for BOTH flat & curved now) ----
+    // datasheet figures: avgPowerSqm = sustained content, maxPowerSqm = ≤100% white.
+    // PEAK_FACTOR = peak (all-white) / sustained avg for LED display content.
+    // Industry rule-of-thumb is ~3× — drives MCB sizing (peak trips breakers,
+    // not sustained avg). Editable here; not a magic number elsewhere in the file.
+    const PEAK_FACTOR = 3;
+    const AC_VOLTAGE = 220; // India single-phase nominal for MCB current calc
     const avgPowerW = Math.round(areaSqm * (product.avgPowerSqm || 0));
     const maxPowerW = Math.round(areaSqm * (product.maxPowerSqm || 0));
-    const recommendedSupplyKw = Math.max(1, Math.ceil((maxPowerW * 1.25) / 1000));
+    const peakPowerW = Math.round(avgPowerW * PEAK_FACTOR); // = avg × 3, conservative
+    const peakCurrentA = +(peakPowerW / AC_VOLTAGE).toFixed(1);
+    const mcbRating = currentToMCB(peakCurrentA);
+    const recommendedSupplyKw = Math.max(1, Math.ceil((peakPowerW * 1.25) / 1000));
+
+    // ---- structural (for BOTH flat & curved) ----
+    // Auto-derive vertical support count from width — same rule as the curved
+    // branch below ("a post every ~960mm, plus one for the endcap").
+    // Allows user override via params.nVerticalSupports later if needed.
+    const nVerticalSupports = (params.nVerticalSupports != null && +params.nVerticalSupports >= 2)
+      ? Math.round(+params.nVerticalSupports)
+      : Math.ceil(builtWmm / 960) + 1;
+    // Estimated fabrication structure weight (curved gets its own steelWeightKg
+    // computed from steel-tube geometry below). For flat: industry rule ~55% of
+    // cabinet weight covers vertical posts, horizontal rails, brackets, base.
+    const flatSteelWeightKg = Math.round(screenWeightKg * 0.55);
+    // TUBE_WORKING_LOAD is for the VR-standard 40mm OD × 2.5mm steel tube;
+    // verify before quoting spans > 4m.
+    const TUBE_WORKING_LOAD_KG = 250;
+    const TUBE_SPEC = "40mm OD × 2.5mm wall steel";
 
     // ---- pricing (shared) ----
     const pr = priceForPitch(product, pitch);
@@ -244,6 +285,16 @@
       };
     }
 
+    // ---- structural load + safety (unified for flat & curved) ----
+    // Picks the right steel-weight basis: curved screens have their own
+    // tube-geometry-derived steelWeightKg; flat uses the 55% rule.
+    const structuralSteelKg = curve ? curve.steelWeightKg : flatSteelWeightKg;
+    const totalSystemKg = screenWeightKg + structuralSteelKg;
+    const loadPerSupportKg = Math.round((totalSystemKg / Math.max(1, nVerticalSupports)) * 10) / 10;
+    // Safety factor = rated working load ÷ actual load (×1.05 for tube self-weight).
+    // SF ≥ 2 is the comfort zone; below 1.5 → add supports or upgrade tube.
+    const safetyFactor = +(TUBE_WORKING_LOAD_KG / Math.max(0.1, loadPerSupportKg * 1.05)).toFixed(1);
+
     const subtotal = lines.reduce((s, l) => s + l.amount, 0);
     const totalGst = lines.reduce((s, l) => s + l.gst, 0);
     const grandTotal = subtotal + totalGst;
@@ -272,6 +323,11 @@
       pxW, pxH, totalPixels, areaSqft, areaSqm, ports,
       diagInches, aspectRatio, pixelDensitySqm, minViewingDistanceM,
       perCabWeightKg, screenWeightKg, avgPowerW, maxPowerW, recommendedSupplyKw,
+      // electrical (Phase 1 — peak + MCB)
+      peakPowerW, peakCurrentA, mcbRating, peakFactor: PEAK_FACTOR, acVoltage: AC_VOLTAGE,
+      // structural (Phase 1 — load + safety, unified flat & curved)
+      nVerticalSupports, structuralSteelKg, totalSystemKg, loadPerSupportKg, safetyFactor,
+      tubeWorkingLoadKg: TUBE_WORKING_LOAD_KG, tubeSpec: TUBE_SPEC,
       tech,
       lines, subtotal, totalGst, grandTotal,
       curve,
@@ -290,12 +346,19 @@
     if (reqW <= 0 || reqH <= 0) return { nearest: null, optimal: null };
 
     let bestOpt = null, bestNear = null;
+    // Manual-mode lock: when the user has explicitly picked a cabinet (and
+    // orientation), the fit cards must stay on THAT cabinet — not silently
+    // jump to a different one the algorithm happens to prefer.
+    const lockedCabIndex = (params.manualCab && params.cabIndex != null) ? +params.cabIndex : null;
+    const lockedOrientation = (params.manualCab && params.orientation) ? params.orientation : null;
     product.cabinets.forEach((cab, cabIndex) => {
+      if (lockedCabIndex != null && cabIndex !== lockedCabIndex) return;
       // Module-based builds (modules-on-frame) are a deliberate construction
       // choice — AUTO never picks them. User must select via Manual override.
-      if (cab.type === "module") return;
+      if (cab.type === "module" && lockedCabIndex == null) return;
       const orientations = cab.w === cab.h ? ["native"] : ["native", "rotated"];
       orientations.forEach((orientation) => {
+        if (lockedOrientation && orientation !== lockedOrientation) return;
         const cw = orientation === "rotated" ? cab.h : cab.w;
         const ch = orientation === "rotated" ? cab.w : cab.h;
 
@@ -331,7 +394,7 @@
   return {
     MM_PER_FT, ftToMm, mmToFt, fmtINR, PRESETS,
     parseDbXml, getProduct, isMicro,
-    priceForPitch, controllerPrice, installRate,
+    priceForPitch, controllerPrice, installRate, currentToMCB,
     radiusFrom, curveMetrics, computeQuote, findFits, quoteRef,
   };
 });
