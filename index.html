@@ -621,179 +621,348 @@ function PriceTable({r,paper}){
 }
 
 /* ───────── print / PDF sheet ───────── */
+/* Indian lakh/crore number-to-words — used in the Grand Total hero pillar. */
+function numToWords(n){
+  if(!n) return "zero";
+  const ones=["","one","two","three","four","five","six","seven","eight","nine","ten","eleven","twelve","thirteen","fourteen","fifteen","sixteen","seventeen","eighteen","nineteen"];
+  const tens=["","","twenty","thirty","forty","fifty","sixty","seventy","eighty","ninety"];
+  const words=(x)=>{
+    if(x<20) return ones[x];
+    if(x<100) return tens[Math.floor(x/10)]+(x%10?"-"+ones[x%10]:"");
+    return ones[Math.floor(x/100)]+" hundred"+(x%100?" "+words(x%100):"");
+  };
+  n=Math.round(n);
+  const cr=Math.floor(n/10000000);
+  const lk=Math.floor((n%10000000)/100000);
+  const th=Math.floor((n%100000)/1000);
+  const rest=n%1000;
+  const parts=[];
+  if(cr) parts.push(words(cr)+" crore");
+  if(lk) parts.push(words(lk)+" lakh");
+  if(th) parts.push(words(th)+" thousand");
+  if(rest) parts.push(words(rest));
+  return parts.join(" ");
+}
+
+/* The Atlas — PQM PrintSheet.  Editorial spine + roman-numeral chapters +
+   spec-sheet plates + dot-leader data + Grand Total hero pillar.
+   Design DNA is the "B+C mix" mockup that Kathan approved. */
+const ATLAS_CSS = `
+.atlas-print{background:#FBF7EF;color:#1A1208;font-family:'Manrope',sans-serif;font-size:10pt;line-height:1.5;position:relative;overflow:hidden;min-height:297mm}
+.atlas-print::before{content:'';position:absolute;top:0;left:0;bottom:0;width:14mm;background:linear-gradient(160deg,#4E1178 0%,#9D20D6 55%,#793494 100%);z-index:1}
+.atlas-print::after{content:'';position:absolute;top:0;left:14mm;bottom:0;width:2mm;background:linear-gradient(90deg,#00000022,transparent);z-index:1}
+.atlas-spine{position:absolute;z-index:3;top:14mm;left:0;width:14mm;writing-mode:vertical-rl;transform:rotate(180deg);font-family:'JetBrains Mono',monospace;font-size:7pt;letter-spacing:3.5px;text-transform:uppercase;color:#C89DD9;font-weight:600;padding:8mm 2mm;opacity:.9}
+.atlas-spine b{color:#E5B454;letter-spacing:4px}
+.atlas-page{position:relative;z-index:2;padding:14mm 16mm 14mm 22mm}
+.atlas-super{display:flex;justify-content:space-between;align-items:baseline;font-family:'JetBrains Mono',monospace;font-size:8pt;letter-spacing:3px;text-transform:uppercase;color:#6B5E4A;font-weight:700;margin-bottom:14px;gap:8px;flex-wrap:wrap}
+.atlas-super .grow{margin-left:auto}
+.atlas-stamp{background:#E5B454;color:#3A2500;padding:3px 10px;border-radius:2px;letter-spacing:3px;font-weight:800}
+.atlas-brand{display:flex;justify-content:space-between;align-items:baseline;padding-bottom:10px;border-bottom:1px solid #C8BEA6}
+.atlas-brand .name{font-family:'Fraunces',serif;font-size:15pt;font-weight:500;letter-spacing:.5px}
+.atlas-brand .name em{font-style:italic;color:#9D20D6;font-weight:400}
+.atlas-brand .ref{font-family:'JetBrains Mono',monospace;font-size:8.5pt;color:#6B5E4A;letter-spacing:1px}
+.atlas-title{margin:22px 0 12px}
+.atlas-title .kicker{font-family:'JetBrains Mono',monospace;font-size:8pt;letter-spacing:4px;text-transform:uppercase;color:#793494;font-weight:800;margin-bottom:10px}
+.atlas-title h1{font-family:'Fraunces',serif;font-weight:300;font-size:44pt;line-height:.92;letter-spacing:-.03em;color:#1A1208;margin:0 0 8px}
+.atlas-title h1 em{font-style:italic;color:#9D20D6;font-weight:200}
+.atlas-title .lede{font-family:'Fraunces',serif;font-weight:300;font-style:italic;font-size:12.5pt;line-height:1.5;color:#3A2C1A;max-width:78%;margin-top:8px}
+.atlas-plate{border:.4mm solid #1A1208;padding:0;display:grid;grid-template-columns:2fr 1fr 1fr;margin-top:20px}
+.atlas-plate .cell{padding:9px 12px;border-right:.25mm solid #1A1208}
+.atlas-plate .cell:last-child{border-right:none}
+.atlas-plate .k{font-family:'JetBrains Mono',monospace;font-size:7pt;letter-spacing:2.5px;text-transform:uppercase;color:#6B5E4A;font-weight:700;margin-bottom:4px}
+.atlas-plate .v{font-family:'Fraunces',serif;font-size:14pt;font-weight:500;line-height:1.05;color:#1A1208;letter-spacing:-.005em}
+.atlas-plate .v em{font-style:italic;color:#9D20D6;font-weight:400}
+.atlas-plate .v small{display:block;font-family:'JetBrains Mono',monospace;font-size:7.5pt;color:#6B5E4A;margin-top:3px;letter-spacing:.5px;font-weight:500}
+.atlas-ch{margin:26px 0 10px;display:grid;grid-template-columns:52px 1fr auto;align-items:baseline;gap:12px;break-after:avoid}
+.atlas-ch .roman{font-family:'Fraunces',serif;font-style:italic;font-weight:300;font-size:32pt;line-height:.9;color:#9D20D6;letter-spacing:-.02em}
+.atlas-ch .name{font-family:'Fraunces',serif;font-size:18pt;font-weight:400;color:#1A1208;letter-spacing:-.01em;line-height:1.05}
+.atlas-ch .name em{font-style:italic;color:#793494}
+.atlas-ch .name small{display:block;font-family:'JetBrains Mono',monospace;font-size:8pt;letter-spacing:2px;text-transform:uppercase;color:#6B5E4A;font-weight:600;margin-top:4px}
+.atlas-ch .side{font-family:'JetBrains Mono',monospace;font-size:7.5pt;letter-spacing:2.5px;text-transform:uppercase;color:#9D20D6;font-weight:800;background:#F5EFE6;padding:3px 8px;border-radius:2px;align-self:center}
+.atlas-ch .rule{grid-column:2/-1;height:1px;background:linear-gradient(90deg,#1A1208,transparent);margin-top:6px}
+.atlas-draw{border:.35mm solid #1A1208;padding:14px;background:#FDFAF3;margin-top:8px;break-inside:avoid}
+.atlas-draw .cap{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:7pt;letter-spacing:2px;color:#6B5E4A;text-transform:uppercase;font-weight:700}
+.atlas-draw .cap.top{margin-bottom:6px}
+.atlas-draw .cap.bot{margin-top:6px;padding-top:6px;border-top:.15mm solid #E4DCCB}
+.atlas-3d{position:relative;overflow:hidden;background:linear-gradient(135deg,#0d0819 0%,#1a0f2e 60%,#0d0819 100%);height:220px;margin-top:8px;box-shadow:inset 0 0 40px rgba(157,32,214,.35);break-inside:avoid}
+.atlas-3d img{width:100%;height:100%;display:block;object-fit:cover}
+.atlas-3d .marks{position:absolute;top:14px;left:16px;font-family:'JetBrains Mono',monospace;font-size:7.5pt;letter-spacing:3px;text-transform:uppercase;color:#C89DD9;opacity:.9}
+.atlas-3d .marks span{color:#E5B454}
+.atlas-3d .label{position:absolute;bottom:12px;right:16px;font-family:'Fraunces',serif;font-style:italic;font-size:11pt;color:#C89DD9;opacity:.9}
+.atlas-duo{display:grid;grid-template-columns:1fr 1fr;gap:0 32px;margin-top:8px;break-inside:avoid}
+.atlas-duo .col-h{font-family:'JetBrains Mono',monospace;font-size:7.5pt;letter-spacing:3px;text-transform:uppercase;color:#9D20D6;font-weight:800;padding:6px 0;margin-bottom:4px;border-bottom:.3mm solid #1A1208}
+.atlas-dl{display:grid;grid-template-columns:1fr auto;gap:0;margin:0}
+.atlas-dl dt,.atlas-dl dd{padding:5px 0;border-bottom:.15mm dotted #C8BEA6;margin:0}
+.atlas-dl dt{font-size:9pt;color:#3A2C1A;font-weight:500}
+.atlas-dl dd{font-family:'JetBrains Mono',monospace;font-size:9.5pt;font-weight:600;color:#1A1208;text-align:right;padding-left:8px}
+.atlas-dl dd.hi{color:#9D20D6}
+.atlas-dl dd.good{color:#0E7F4F}
+.atlas-dl dd.warm{color:#7A4F00}
+.atlas-total{margin-top:12px;padding:22px 26px 20px;background:linear-gradient(135deg,#FBF7EF 0%,#F5EFE6 100%);border:.4mm solid #1A1208;border-left:6px solid #9D20D6;break-inside:avoid}
+.atlas-total .caption{font-family:'JetBrains Mono',monospace;font-size:8pt;letter-spacing:3px;text-transform:uppercase;color:#6B5E4A;font-weight:800;margin-bottom:8px}
+.atlas-total .fig{display:grid;grid-template-columns:1.1fr 2fr;gap:24px;align-items:baseline}
+.atlas-total .num{font-family:'Fraunces',serif;font-weight:400;font-size:44pt;line-height:.92;color:#9D20D6;letter-spacing:-.03em;display:flex;align-items:baseline;gap:4px}
+.atlas-total .num .rs{font-size:34pt;color:#793494}
+.atlas-total .words{font-family:'Fraunces',serif;font-style:italic;font-weight:300;font-size:11.5pt;line-height:1.35;color:#3A2C1A;text-transform:capitalize}
+.atlas-total .strap{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px;padding-top:12px;border-top:.2mm solid #C8BEA6;font-family:'JetBrains Mono',monospace;font-size:8pt;letter-spacing:2px;text-transform:uppercase;color:#6B5E4A;font-weight:700}
+.atlas-total .strap b{color:#9D20D6;letter-spacing:1.5px;font-weight:800}
+.atlas-notes{margin-top:14px;padding:12px 14px;background:#F5EFE6;border-left:2px solid #E5B454;font-size:9pt;line-height:1.55;color:#3A2C1A}
+.atlas-notes b{color:#1A1208;font-weight:700}
+.atlas-notes .fine{display:block;margin-top:6px;font-style:italic;color:#6B5E4A;font-size:8.5pt}
+.atlas-foot{margin-top:20px;padding-top:14px;border-top:.3mm solid #1A1208;display:flex;justify-content:space-between;align-items:baseline;font-family:'JetBrains Mono',monospace;font-size:7.5pt;letter-spacing:2px;color:#6B5E4A;text-transform:uppercase;font-weight:700;gap:10px}
+.atlas-foot .brand{font-family:'Fraunces',serif;font-style:italic;font-size:11pt;font-weight:500;text-transform:none;letter-spacing:0;color:#1A1208;text-align:center;line-height:1.2}
+.atlas-foot .brand em{color:#9D20D6}
+.atlas-foot .brand small{display:block;font-family:'JetBrains Mono',monospace;font-size:6.5pt;letter-spacing:2px;text-transform:uppercase;color:#6B5E4A;margin-top:3px;font-style:normal}
+.atlas-qtable{width:100%;border-collapse:collapse;margin-top:8px;background:#F8F4EA;border:.3mm solid #1A1208;break-inside:avoid}
+.atlas-qtable th{background:#1A1208;color:#F5EFE6;padding:8px 12px;text-align:left;font-family:'JetBrains Mono',monospace;font-size:7.5pt;letter-spacing:2.5px;text-transform:uppercase;font-weight:700}
+.atlas-qtable td{padding:8px 12px;border-bottom:.15mm dotted #C8BEA6;font-size:9.5pt;vertical-align:top}
+.atlas-qtable td.r{text-align:right;font-family:'JetBrains Mono',monospace;font-weight:600}
+.atlas-qtable td small{display:block;font-family:'JetBrains Mono',monospace;font-size:7.5pt;color:#6B5E4A;letter-spacing:.5px;margin-top:2px}
+.atlas-subrow{display:grid;grid-template-columns:1fr auto auto;gap:16px;align-items:baseline;padding:8px 12px;background:#F5EFE6;border-bottom:.3mm solid #1A1208;font-size:9pt}
+.atlas-subrow .k{color:#6B5E4A;font-family:'JetBrains Mono',monospace;font-size:8pt;letter-spacing:2px;text-transform:uppercase;font-weight:700}
+.atlas-subrow .v{font-family:'JetBrains Mono',monospace;font-weight:600;text-align:right}
+.atlas-pillars{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:8px;break-inside:avoid}
+.atlas-pill{background:#FBF7EF;border:.3mm solid #1A1208;padding:10px 12px}
+.atlas-pill .k{font-family:'JetBrains Mono',monospace;font-size:7pt;letter-spacing:2.5px;text-transform:uppercase;color:#6B5E4A;font-weight:700;margin-bottom:4px}
+.atlas-pill .v{font-family:'Fraunces',serif;font-size:19pt;font-weight:500;line-height:1;color:#1A1208;letter-spacing:-.01em}
+.atlas-pill .v em{font-style:italic;color:#9D20D6;font-size:13pt;font-weight:400}
+.atlas-pill.hi{background:linear-gradient(135deg,#F5EFE6 0%,#FBF7EF 100%);border-left:3px solid #9D20D6}
+.atlas-pill.warm{border-left:3px solid #E5B454}
+`;
+
 function PrintSheet({r,meta,preview,threeDSnapshot}){
   if(!r) return null;
-  const ink="#1A1208",muted="#6B5E4A",mg=C.magenta;
-  const Row=({k,v,accent})=>(
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"4.5px 0",borderBottom:"1px solid #E4DCCB"}}>
-      <span style={{fontSize:11,letterSpacing:.4,textTransform:"uppercase",color:muted,fontWeight:600}}>{k}</span>
-      <span style={{fontFamily:MO,fontSize:12.5,fontWeight:600,color:accent||ink}}>{v}</span>
-    </div>
-  );
-  const SectionH=({children})=>(<div style={{fontSize:11,letterSpacing:2,color:mg,fontWeight:700,textTransform:"uppercase",margin:"12px 0 6px"}}>{children}</div>);
   const cv=r.curve;
+  const isCurved=r.mode==="curved";
+  const sfColor=r.safetyFactor>=2?"#0E7F4F":r.safetyFactor>=1.5?"#B45309":"#B91C1C";
+  const romans=["i","ii","iii","iv","v","vi","vii","viii","ix"];
+  let ci=0;
+  const R=()=>romans[ci++];
+  const S=()=>"§0"+ci;
   return (
-    <div className={preview?"":"vr-print"} style={{background:"#fff",color:ink,fontFamily:MN,padding:0,display:preview?"block":undefined}}>
-      {/* header */}
-      <div className="avoid-break" style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",borderBottom:`2px solid ${mg}`,paddingBottom:12}}>
-        <div style={{display:"flex",alignItems:"center",gap:12}}>
-          <VRLogo size={42}/>
-          <div>
-            <div style={{fontSize:10,letterSpacing:4,color:mg,fontWeight:700,textTransform:"uppercase"}}>Visual Rhyme Pvt. Ltd.</div>
-            <div style={{fontFamily:FR,fontSize:26,fontWeight:600,marginTop:2,lineHeight:1}}>Pixel Quote Max — {r.mode==="curved"?"Curved":"Flat"} LED {r.mode==="curved"?"Spec & Quote":"Quotation"}</div>
-          </div>
-        </div>
-        <div style={{textAlign:"right",fontFamily:MO,fontSize:11,color:muted}}>
-          <div style={{fontSize:13,color:ink,fontWeight:700}}>{meta.project||"Untitled Project"}</div>
-          {meta.client&&<div style={{marginTop:2}}>{meta.client}</div>}
-          <div style={{marginTop:2}}>{meta.ref}</div>
-          <div>{meta.date}</div>
-        </div>
-      </div>
+    <div className={preview?"atlas-print":"vr-print atlas-print"} style={{display:preview?"block":undefined}}>
+      <style dangerouslySetInnerHTML={{__html:ATLAS_CSS}}/>
+      <div className="atlas-spine"><b>Visual Rhyme</b> · {isCurved?"Curved Quotation":"Quotation"} · {meta.ref}</div>
+      <div className="atlas-page">
 
-      {/* drawings — mandatory in both modes */}
-      <SectionH>Drawings</SectionH>
-      <div className="avoid-break" style={{display:"grid",gridTemplateColumns: r.mode==="curved"?"1fr 1fr":"1fr",gap:14}}>
-        <div style={{border:"1px solid #E4DCCB",borderRadius:6,overflow:"hidden"}}>
+        <div className="atlas-super">
+          <span>Visual Rhyme Pvt. Ltd. · Ahmedabad</span>
+          <span className="grow"></span>
+          <span className="atlas-stamp">Quotation</span>
+        </div>
+        <div className="atlas-brand">
+          <div className="name">Pixel Quote <em>Max</em></div>
+          <div className="ref">{meta.ref} · {meta.date}</div>
+        </div>
+
+        <div className="atlas-title">
+          <div className="kicker">{r.product.series} · {isCurved?"Curved":"Flat"} LED · P{r.pitch}</div>
+          <h1>{meta.project||"LED"}<br/><em>{isCurved?"Curved Wall.":"Quote."}</em></h1>
+          <div className="lede">A {r.product.series} P{r.pitch} {r.product.type} wall, {num(r.builtWft,1)} by {num(r.builtHft,1)} feet, delivered and installed{meta.client?" for "+meta.client:""}.</div>
+        </div>
+
+        <div className="atlas-plate">
+          <div className="cell"><div className="k">Client</div><div className="v">{meta.client||"—"}<small>{meta.project||"Untitled project"}</small></div></div>
+          <div className="cell"><div className="k">Series</div><div className="v">{r.product.series}<small>{r.product.type} · {r.tech.ipRating||"—"}</small></div></div>
+          <div className="cell"><div className="k">Pitch</div><div className="v"><em>P{r.pitch}</em><small>{r.cab.label}{r.cabW!==r.cab.w?" ↺":""}</small></div></div>
+        </div>
+
+        <div className="atlas-ch">
+          <div className="roman">{R()}</div>
+          <div className="name">{isCurved?"Elevation, plan & ":"Elevation"} <em>{isCurved?"section.":"& drawings."}</em><small>Snapped to whole cabinets · dimensions verified</small></div>
+          <div className="side">{S()}</div>
+          <div className="rule"/>
+        </div>
+        <div className="atlas-draw">
+          <div className="cap top"><span>DRAWING · ELEV-01</span><span>SCALE 1:80 · A4</span></div>
           <ElevationDrawing wmm={r.builtWmm} hmm={r.builtHmm} cabCountW={r.cabCountW} cabCountH={r.cabCountH} modPerCabW={r.modPerCabW} modPerCabH={r.modPerCabH}/>
+          <div className="cap bot"><span>{r.cabCountW} × {r.cabCountH} = {r.totalCabs} cabinets · {num(r.totalMods)} modules</span><span>Elevation view</span></div>
         </div>
-        {r.mode==="curved"&&(
-          <div style={{border:"1px solid #E4DCCB",borderRadius:6,overflow:"hidden"}}>
+        {isCurved && (<>
+          <div className="atlas-draw">
+            <div className="cap top"><span>DRAWING · PLAN-01</span><span>SCALE 1:80 · A4</span></div>
             <PlanDrawing chord={cv.chordMm} R={cv.R} sag={cv.sag} cabCountW={r.cabCountW} curveType={cv.curveType}/>
+            <div className="cap bot"><span>R = {num(cv.R/1000,2)} m · Sag = {num(cv.sag,0)} mm</span><span>Plan view</span></div>
           </div>
-        )}
-      </div>
-      {r.mode==="curved"&&(
-        <div className="avoid-break" style={{border:"1px solid #E4DCCB",borderRadius:6,overflow:"hidden",marginTop:14,maxWidth:300}}>
-          <SectionDrawing sag={cv.sag} curveType={cv.curveType}/>
-        </div>
-      )}
-
-      {/* Phase 3: 3D snapshot — embedded from Three.js canvas captured at export time. */}
-      {threeDSnapshot && (
-        <div className="avoid-break" style={{marginTop:14}}>
-          <SectionH>3D Reference</SectionH>
-          <div style={{border:"1px solid #E4DCCB",borderRadius:6,overflow:"hidden",background:"#0d0d12"}}>
-            <img src={threeDSnapshot} alt="3D screen reference" style={{width:"100%",display:"block"}}/>
+          <div className="atlas-draw" style={{maxWidth:300}}>
+            <div className="cap top"><span>DRAWING · SECT-01</span><span>SCALE 1:40</span></div>
+            <SectionDrawing sag={cv.sag} curveType={cv.curveType}/>
+            <div className="cap bot"><span>{cv.curveType==="outer"?"Outer / Convex":"Inner / Concave"}</span><span>Section</span></div>
           </div>
-        </div>
-      )}
+        </>)}
 
-      {/* spec */}
-      <div className="avoid-break" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginTop:6}}>
-        <div>
-          <SectionH>Configuration</SectionH>
-          <Row k="Product" v={r.product.series}/>
-          <Row k="Type / SKU" v={r.sku}/>
-          <Row k="Pixel pitch" v={r.pitch+" mm"}/>
-          <Row k="Requested size" v={`${num(r.reqWmm/304.8,2)} × ${num(r.reqHmm/304.8,2)} ft`}/>
-          <Row k="Built size" v={`${num(r.builtWft,2)} × ${num(r.builtHft,2)} ft`} accent={mg}/>
-          <Row k="Cabinet" v={r.cab.label + (r.cabW!==r.cab.w?" · ↺ rotated":"")}/>
-          {r.mode==="curved"&&<Row k="Curve type" v={cv.curveType==="outer"?"Outer / Convex":"Inner / Concave"}/>}
-        </div>
-        <div>
-          <SectionH>Build Quantities</SectionH>
-          <Row k="Cabinets (W × H)" v={`${r.cabCountW} × ${r.cabCountH} = ${r.totalCabs}`} accent={mg}/>
-          <Row k="Modules / cabinet" v={`${r.modPerCabW} × ${r.modPerCabH} = ${r.modPerCab}`}/>
-          <Row k="Total modules" v={num(r.totalMods)}/>
-          <Row k="Pixel resolution" v={`${num(r.pxW)} × ${num(r.pxH)} px`}/>
-          <Row k="Total pixels" v={num(r.totalPixels)}/>
-          <Row k="Active area" v={`${num(r.areaSqft,1)} sqft`}/>
-          <Row k="Screen diagonal" v={`${num(r.diagInches,1)} in (${num(r.diagInches/12,2)} ft)`}/>
-          <Row k="Aspect ratio" v={r.aspectRatio}/>
-          <Row k="Pixel density" v={`${num(r.pixelDensitySqm)} px/sqm`}/>
-          <Row k="Min. viewing distance" v={`${num(r.minViewingDistanceM,1)} m`}/>
-          <Row k="Controller ports" v={String(r.ports)}/>
-        </div>
-      </div>
+        {threeDSnapshot && (<>
+          <div className="atlas-ch">
+            <div className="roman">{R()}</div>
+            <div className="name"><em>In situ.</em><small>Straight-on 3D reference · captured at export</small></div>
+            <div className="side">{S()}</div>
+            <div className="rule"/>
+          </div>
+          <div className="atlas-3d">
+            <div className="marks">3D REFERENCE · <span>STRAIGHT-ON</span> · 1200 × 720</div>
+            <img src={threeDSnapshot} alt="3D screen reference"/>
+            <div className="label">as it will stand.</div>
+          </div>
+        </>)}
 
-      {/* Power & Weight — both modes */}
-      <div className="avoid-break" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginTop:6}}>
-        <div>
-          <SectionH>Power · Electrical</SectionH>
-          <Row k="Avg consumption" v={`${num(r.avgPowerW)} W · ${num(r.avgPowerW/1000,2)} kW`}/>
-          <Row k="Peak draw (×3, all-white)" v={`${num(r.peakPowerW)} W · ${num(r.peakPowerW/1000,2)} kW`}/>
-          <Row k="Peak current @ 220V" v={`${num(r.peakCurrentA,1)} A`}/>
-          <Row k="MCB rating (single-phase)" v={r.mcbRating} accent={mg}/>
-          <Row k="Recommended supply" v={`${num(r.recommendedSupplyKw)} kW`} accent={mg}/>
-          <Row k="AC input" v="100–240V · 50/60 Hz"/>
+        <div className="atlas-ch">
+          <div className="roman">{R()}</div>
+          <div className="name">Configuration &amp; <em>dimensions.</em><small>Built screen · pixel resolution · cabinet grid</small></div>
+          <div className="side">{S()}</div>
+          <div className="rule"/>
         </div>
-        <div>
-          <SectionH>Weight · Structure</SectionH>
-          <Row k="Per cabinet" v={`${num(r.perCabWeightKg,1)} kg`}/>
-          <Row k="Screen weight (cabinets)" v={`${num(r.screenWeightKg)} kg`}/>
-          <Row k="Steel structure (est.)" v={`${num(r.structuralSteelKg)} kg`}/>
-          <Row k="Total system weight" v={`${num(r.totalSystemKg)} kg`} accent={mg}/>
-          <Row k="Vertical supports" v={`${r.nVerticalSupports} × ${r.tubeSpec}`}/>
-          <Row k="Load per support point" v={`${num(r.loadPerSupportKg,1)} kg`}/>
-          <Row k="Safety factor" v={`${num(r.safetyFactor,1)}×`} accent={r.safetyFactor>=2?"#34d399":r.safetyFactor>=1.5?"#fbbf24":"#ef4444"}/>
-        </div>
-      </div>
-
-      {/* Technical Specifications — both modes */}
-      {r.tech && r.tech.brightnessNits && (
-        <div className="avoid-break" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginTop:6}}>
+        <div className="atlas-duo">
           <div>
-            <SectionH>Technical Specifications</SectionH>
-            <Row k="Display technology" v={r.tech.displayTech || "—"}/>
-            <Row k="LED type" v={r.tech.ledType || "—"}/>
-            <Row k="Cabinet depth" v={r.tech.cabinetDepthMm ? `${r.tech.cabinetDepthMm} mm` : "—"}/>
-            <Row k="Module depth" v={r.tech.moduleDepthMm ? `${r.tech.moduleDepthMm} mm` : "—"}/>
-            <Row k="Ingress protection" v={r.tech.ipRating || "—"}/>
-            <Row k="Bit depth" v={r.tech.bitDepth ? `${r.tech.bitDepth}-bit (${num(Math.pow(2,r.tech.bitDepth))} levels)` : "—"}/>
+            <div className="col-h">Built &amp; Panel</div>
+            <dl className="atlas-dl">
+              <dt>Requested</dt><dd>{num(r.reqWmm/304.8,2)} × {num(r.reqHmm/304.8,2)} ft</dd>
+              <dt>Built dimensions</dt><dd className="hi">{num(r.builtWft,2)} × {num(r.builtHft,2)} ft</dd>
+              <dt>Millimetres</dt><dd>{num(r.builtWmm)} × {num(r.builtHmm)} mm</dd>
+              <dt>Active area</dt><dd>{num(r.areaSqft,1)} sqft</dd>
+              <dt>Diagonal · aspect</dt><dd>{num(r.diagInches,1)}″ · {r.aspectRatio}</dd>
+              <dt>Cabinets (w × h)</dt><dd className="hi">{r.cabCountW} × {r.cabCountH} = {r.totalCabs}</dd>
+              <dt>Modules per cabinet</dt><dd>{r.modPerCabW} × {r.modPerCabH} = {r.modPerCab}</dd>
+              <dt>Total modules</dt><dd>{num(r.totalMods)}</dd>
+            </dl>
           </div>
           <div>
-            <SectionH>Image & Reliability</SectionH>
-            <Row k="Max brightness" v={`${num(r.tech.brightnessNits)} nits`} accent={C.amber}/>
-            <Row k="Refresh rate" v={`${num(r.tech.refreshHz)} Hz`}/>
-            <Row k="Contrast (static / dynamic)" v={`${num(r.tech.contrastStatic)}:1 / ${num(r.tech.contrastDynamic)}:1`}/>
-            <Row k="Viewing angle" v={r.tech.viewingAngleDeg ? `≤ ${r.tech.viewingAngleDeg}°` : "—"}/>
-            <Row k="Colour gamut" v={`${num(r.tech.colorGamutSrgbPct)}% sRGB · ${num(r.tech.colorGamutRec2020Pct)}% Rec.2020`}/>
-            <Row k="Operating temperature" v={(r.tech.opTempMin!=null) ? `${r.tech.opTempMin}°C to ${r.tech.opTempMax}°C @ 10-90% RH` : "—"}/>
-            <Row k="Lifespan / Warranty" v={`~${num((r.tech.lifespanHours||0)/1000)}k hrs · ${r.tech.warrantyYears||"—"} yr warranty`}/>
+            <div className="col-h">Pixel &amp; Light</div>
+            <dl className="atlas-dl">
+              <dt>Pixel resolution</dt><dd className="hi">{num(r.pxW)} × {num(r.pxH)}</dd>
+              <dt>Total pixels</dt><dd>{num(r.totalPixels)}</dd>
+              <dt>Pixel density</dt><dd>{num(r.pixelDensitySqm)} / sqm</dd>
+              <dt>Brightness</dt><dd>{num(r.tech.brightnessNits)} nits</dd>
+              <dt>Refresh · IP</dt><dd>{num(r.tech.refreshHz)} Hz · {r.tech.ipRating||"—"}</dd>
+              <dt>Bit depth</dt><dd>{r.tech.bitDepth?r.tech.bitDepth+"-bit":"—"}</dd>
+              <dt>Colour gamut</dt><dd>{num(r.tech.colorGamutSrgbPct)}% sRGB</dd>
+              <dt>Min viewing dist.</dt><dd>{num(r.minViewingDistanceM,1)} m</dd>
+              <dt>Controller ports</dt><dd>{r.ports}</dd>
+            </dl>
           </div>
         </div>
-      )}
 
-      {/* curved geometry + structure */}
-      {r.mode==="curved"&&(
-        <div className="avoid-break" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginTop:6}}>
+        <div className="atlas-ch">
+          <div className="roman">{R()}</div>
+          <div className="name">Power &amp; <em>structure.</em><small>Peak draw · MCB · load per support · safety factor</small></div>
+          <div className="side">{S()}</div>
+          <div className="rule"/>
+        </div>
+        <div className="atlas-pillars">
+          <div className="atlas-pill hi"><div className="k">Peak draw</div><div className="v">{num(r.peakPowerW/1000,1)}<em> kW</em></div></div>
+          <div className="atlas-pill hi"><div className="k">MCB</div><div className="v" style={{fontSize:"14pt"}}>{r.mcbRating}</div></div>
+          <div className="atlas-pill warm"><div className="k">Load / point</div><div className="v">{num(r.loadPerSupportKg,0)}<em> kg</em></div></div>
+          <div className="atlas-pill warm"><div className="k">Safety factor</div><div className="v" style={{color:sfColor}}>{num(r.safetyFactor,1)}<em>×</em></div></div>
+        </div>
+        <div className="atlas-duo" style={{marginTop:14}}>
           <div>
-            <SectionH>Curve Geometry</SectionH>
-            <Row k="Radius (R)" v={`${num(cv.R/1000,2)} m`} accent={C.amber}/>
-            <Row k={cv.curveType==="outer"?"Sagitta · cantilever":"Sagitta · depth"} v={`${num(cv.sag,0)} mm`}/>
-            <Row k="Arc length" v={`${num(cv.arcLen,0)} mm`}/>
-            <Row k="Per-joint back gap" v={`${num(cv.gapPerJoint,1)} mm`} accent={verdictColor(cv.verdict)}/>
-            <Row k="Per-cabinet wedge" v={`${num(cv.cabAngleDeg,2)}°`}/>
-            <Row k="Curve verdict" v={cv.verdict} accent={verdictColor(cv.verdict)}/>
+            <div className="col-h">Power &amp; Electrical</div>
+            <dl className="atlas-dl">
+              <dt>Avg consumption</dt><dd>{num(r.avgPowerW)} W</dd>
+              <dt>Peak draw (×3, all-white)</dt><dd className="hi">{num(r.peakPowerW/1000,2)} kW</dd>
+              <dt>Peak current @ 220 V</dt><dd>{num(r.peakCurrentA,1)} A</dd>
+              <dt>MCB rating</dt><dd className="hi">{r.mcbRating}</dd>
+              <dt>Recommended supply</dt><dd className="hi">{num(r.recommendedSupplyKw)} kW</dd>
+              <dt>AC input</dt><dd>100–240 V · 50/60 Hz</dd>
+            </dl>
           </div>
           <div>
-            <SectionH>Structure & Mounting</SectionH>
-            <Row k="Mounting strategy" v={cv.structuralStrategy}/>
-            <Row k="Cantilever @ centre" v={`${num(cv.cantileverAtCenter,0)} mm`}/>
-            <Row k="Wall contact" v={cv.wallContactAtEnds}/>
-            <Row k="Vertical posts" v={`${cv.vertPosts}`}/>
-            <Row k="Horizontal rails" v={`${cv.horizRails}`}/>
+            <div className="col-h">Weight &amp; Structure</div>
+            <dl className="atlas-dl">
+              <dt>Per cabinet</dt><dd>{num(r.perCabWeightKg,1)} kg</dd>
+              <dt>Screen weight</dt><dd>{num(r.screenWeightKg)} kg</dd>
+              <dt>Steel structure (est.)</dt><dd>{num(r.structuralSteelKg)} kg</dd>
+              <dt>Total system</dt><dd className="hi">{num(r.totalSystemKg)} kg</dd>
+              <dt>Vertical supports</dt><dd>{r.nVerticalSupports}</dd>
+              <dt>Tube spec</dt><dd>{r.tubeSpec}</dd>
+              <dt>Load per point</dt><dd className="hi">{num(r.loadPerSupportKg,1)} kg</dd>
+              <dt>Safety factor</dt><dd style={{color:sfColor,fontWeight:700}}>{num(r.safetyFactor,1)}× (rated {r.tubeWorkingLoadKg})</dd>
+            </dl>
           </div>
         </div>
-      )}
 
-      {/* quote */}
-      <SectionH>Quotation</SectionH>
-      <div className="avoid-break"><PriceTable r={r} paper/></div>
+        {isCurved && (<>
+          <div className="atlas-ch">
+            <div className="roman">{R()}</div>
+            <div className="name">Curve <em>geometry.</em><small>Radius · sagitta · per-joint gap · structural strategy</small></div>
+            <div className="side">{S()}</div>
+            <div className="rule"/>
+          </div>
+          <div className="atlas-duo">
+            <div>
+              <div className="col-h">Geometry</div>
+              <dl className="atlas-dl">
+                <dt>Radius (R)</dt><dd className="hi">{num(cv.R/1000,2)} m</dd>
+                <dt>{cv.curveType==="outer"?"Sagitta · cantilever":"Sagitta · depth"}</dt><dd>{num(cv.sag,0)} mm</dd>
+                <dt>Arc length</dt><dd>{num(cv.arcLen,0)} mm</dd>
+                <dt>Per-joint back gap</dt><dd style={{color:verdictColor(cv.verdict)}}>{num(cv.gapPerJoint,1)} mm</dd>
+                <dt>Per-cabinet wedge</dt><dd>{num(cv.cabAngleDeg,2)}°</dd>
+                <dt>Verdict</dt><dd style={{color:verdictColor(cv.verdict)}}>{cv.verdict}</dd>
+              </dl>
+            </div>
+            <div>
+              <div className="col-h">Structure &amp; Mounting</div>
+              <dl className="atlas-dl">
+                <dt>Mounting</dt><dd style={{fontSize:"8.5pt"}}>{cv.structuralStrategy}</dd>
+                <dt>Cantilever @ centre</dt><dd>{num(cv.cantileverAtCenter,0)} mm</dd>
+                <dt>Wall contact</dt><dd style={{fontSize:"8.5pt"}}>{cv.wallContactAtEnds}</dd>
+                <dt>Vertical posts</dt><dd>{cv.vertPosts}</dd>
+                <dt>Horizontal rails</dt><dd>{cv.horizRails}</dd>
+              </dl>
+            </div>
+          </div>
+        </>)}
 
-      {/* notes */}
-      <div className="avoid-break" style={{marginTop:16,fontSize:10.5,lineHeight:1.6,color:muted}}>
-        <strong style={{color:ink}}>Notes:</strong> ACP, scaffolding, H-frame priced as actual. Quote valid 7 working days.
-        All prices inclusive of GST as itemised. Transportation, fabrication & electrical work charged additional unless specified.
-        {r.mode==="curved"&&<span style={{display:"block",marginTop:6,fontStyle:"italic",color:C.wall}}>Pre-engineering estimates for scoping only. Final structural design, anchor specification and wind-load verification must be stamped by a licensed structural engineer per local code (IS 875 Part 3 for wind in India).</span>}
-      </div>
-      <div style={{marginTop:16,paddingTop:10,borderTop:"1px solid #E4DCCB",fontSize:9.5,color:muted,textAlign:"center",letterSpacing:.5,lineHeight:1.6}}>
-        VISUAL RHYME PVT. LTD. · 913, Avirat Silver Radiance 4, SG Hwy, Gota, Ahmedabad-382481 · visualrhyme.digital<br/>
-        © {new Date().getFullYear()} Visual Rhyme Pvt. Ltd. · Kathan Mehta · All rights reserved. This is a tool and can contain errors — verify before ordering.
-      </div>
-      <div style={{marginTop:6,textAlign:"right",fontSize:9,color:muted,opacity:.7,letterSpacing:.4,fontStyle:"italic"}}>
-        Powered by Microtronix Solutions
+        <div className="atlas-ch">
+          <div className="roman">{R()}</div>
+          <div className="name">The <em>quotation.</em><small>All line items · GST as itemised · Grand Total inclusive</small></div>
+          <div className="side">{S()}</div>
+          <div className="rule"/>
+        </div>
+        <table className="atlas-qtable">
+          <thead><tr><th>Item</th><th>Rate</th><th>Qty</th><th style={{textAlign:"right"}}>Amount</th><th style={{textAlign:"right"}}>GST%</th><th style={{textAlign:"right"}}>GST</th></tr></thead>
+          <tbody>
+            {r.lines.map((l,i)=>(
+              <tr key={i}>
+                <td>{l.item}</td>
+                <td>{l.rateUnit==="%"?l.rate+"%":(l.item==="Video Controller"?"Per system":E.fmtINR(l.rate)+l.rateUnit)}</td>
+                <td>{l.qty}</td>
+                <td className="r">{E.fmtINR(l.amount)}</td>
+                <td className="r">{l.gstPct}%</td>
+                <td className="r">{E.fmtINR(l.gst)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="atlas-subrow">
+          <div className="k">Subtotal · before GST</div>
+          <div className="v" style={{color:"#6B5E4A"}}>GST {E.fmtINR(r.totalGst)}</div>
+          <div className="v">{E.fmtINR(r.subtotal)}</div>
+        </div>
+
+        <div className="atlas-total">
+          <div className="caption">Grand Total · inclusive of GST</div>
+          <div className="fig">
+            <div className="num"><span className="rs">₹</span>{E.fmtINR(r.grandTotal).replace("₹","")}</div>
+            <div className="words">{numToWords(r.grandTotal)} rupees — delivered, installed and commissioned.</div>
+          </div>
+          <div className="strap">
+            <span>Validity · <b>7 days</b></span>
+            <span>Payment · <b>60 / 30 / 10</b></span>
+            <span>Warranty · <b>3 years</b></span>
+          </div>
+        </div>
+
+        <div className="atlas-notes">
+          <b>Notes.</b> ACP, scaffolding and H-frame priced as actual. Quote valid seven working days from date of issue. All prices inclusive of GST as itemised. Transportation, fabrication and electrical work charged additional unless specified.
+          {isCurved && <span className="fine">Curved-screen structural, steel and power figures are pre-engineering estimates. Final structural design, anchor specification and wind-load verification must be stamped by a licensed structural engineer per local code (IS 875 Part 3 for wind in India).</span>}
+          <span className="fine">Payment: 60% advance against PO · 30% before dispatch · 10% on install completion. Warranty covers manufacturing defects only. This is a quotation, not an invoice.</span>
+        </div>
+
+        <div className="atlas-foot">
+          <div>{meta.ref} · Page 1 of 1</div>
+          <div className="brand">Visual Rhyme <em>Pvt. Ltd.</em><small>Powered by Microtronix Solutions</small></div>
+          <div>Ahmedabad · 382481</div>
+        </div>
       </div>
     </div>
   );
@@ -1295,96 +1464,178 @@ function App(){
     else if (r.safetyFactor < 2) alerts.push({lvl:"warning",msg:`Safety factor ${r.safetyFactor.toFixed(1)}× is borderline — comfort zone is ≥ 2×.`});
     if (r.peakPowerW > 10000) alerts.push({lvl:"info",msg:`Peak draw ${(r.peakPowerW/1000).toFixed(1)} kW — three-phase supply recommended.`});
     if (alerts.length === 0) alerts.push({lvl:"success",msg:"All structural & electrical parameters within safe operating limits."});
-    const alertHTML = alerts.map(a=>`<div class="alert ${a.lvl}">${a.msg}</div>`).join("");
-    const snapImg = snapURL ? `<h2>3D Reference</h2><div class="threeD"><img src="${snapURL}"/></div>` : "";
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${(project||"VR")} — Structural Report</title>
+    const alertHTML = alerts.map(a=>{
+      const kind = a.lvl === "success" ? "good" : a.lvl === "warning" ? "warn" : a.lvl === "danger" ? "danger" : "warn";
+      return `<div class="atlas-alert ${kind}"><b>${a.msg.split('.')[0]}.</b>${a.msg.split('.').slice(1).join('.')}</div>`;
+    }).join("");
+    const snapImg = snapURL ? `<div class="atlas-ch"><div class="roman">iv</div><div class="name"><em>In situ.</em><small>Straight-on 3D reference · for install crew</small></div><div class="side">§04</div><div class="rule"></div></div><div class="atlas-3d"><div class="marks">STRUCTURAL 3D · <span>STRAIGHT-ON</span> · WIRING VISIBLE</div><img src="${snapURL}"/><div class="label">as it will stand.</div></div>` : "";
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${(project||"VR")} — Structural Report · ${meta.ref}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,ital,wght@9..144,0,300..700;9..144,1,300..500&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Inter',sans-serif;padding:32px 36px;color:#1a1a2e;background:#fafafa;font-size:13px;line-height:1.45;max-width:820px;margin:0 auto}
-h1{font-size:30px;font-weight:800;background:linear-gradient(135deg,#793494,#9D20D6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-0.5px;line-height:1}
-h2{font-size:11px;font-weight:800;color:#793494;margin:20px 0 10px;border-bottom:2px solid #E9D5FF;padding-bottom:6px;letter-spacing:1.5px;text-transform:uppercase}
-.sub{font-size:10px;color:#71717A;letter-spacing:2.5px;text-transform:uppercase;margin-top:6px;font-weight:700}
-.head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #E4DCCB;padding-bottom:14px;margin-bottom:14px}
-.refbox{text-align:right;font-size:11px;color:#71717A;font-family:'JetBrains Mono',monospace}
-.meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;padding:14px 18px;background:#fff;border-radius:10px;border:1px solid #e5e7eb;margin-bottom:6px}
-.meta .lbl{font-size:9px;color:#71717A;text-transform:uppercase;letter-spacing:1.2px;font-weight:700}
-.meta .val{font-size:13px;font-weight:600;margin-top:3px;color:#1a1a2e}
-.badge{padding:2px 9px;border-radius:14px;background:#F3E8FF;color:#9D20D6;font-size:10px;font-weight:700}
-table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;margin-bottom:6px}
-th{padding:7px 10px;background:#09090B;color:#fff;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;text-align:left}
-td{padding:8px 10px;font-size:12px;font-family:'JetBrains Mono',monospace}
-.col2{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:4px}
-.kv{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #E4DCCB;font-size:12px}
-.kv .k{color:#6B5E4A}
-.kv .v{font-family:'JetBrains Mono',monospace;font-weight:600;color:#1a1a2e}
-.kv.accent .v{color:#9D20D6}
-.kv.sf .v{color:${sfColor}}
-.alert{padding:10px 14px;border-radius:8px;font-size:12px;margin:6px 0;font-weight:500;border-left:3px solid}
-.alert.success{background:#ECFDF5;border-left-color:#10B981;color:#065F46}
-.alert.warning{background:#FFFBEB;border-left-color:#F59E0B;color:#92400E}
-.alert.danger{background:#FEF2F2;border-left-color:#EF4444;color:#991B1B}
-.alert.info{background:#EFF6FF;border-left-color:#3B82F6;color:#1E40AF}
-.threeD{border:1px solid #E4DCCB;border-radius:8px;overflow:hidden;background:#0d0d12}
-.threeD img{width:100%;display:block}
-.footer{margin-top:28px;text-align:center;font-size:11px;color:#9CA3AF;border-top:1px solid #e5e7eb;padding-top:16px}
-.brand{font-size:17px;font-weight:700;background:linear-gradient(135deg,#793494,#9D20D6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}
-@page{size:A4 portrait;margin:13mm}
-@media print{body{background:#fff;padding:0;max-width:none}.alert,table,.meta,.threeD{break-inside:avoid}h2{break-after:avoid}}
+body{background:#180d24;color:#1A1208;font-family:'Manrope',sans-serif;-webkit-font-smoothing:antialiased;padding:40px 20px}
+.atlas-print{width:210mm;min-height:297mm;background:#FBF7EF;color:#1A1208;font-family:'Manrope',sans-serif;font-size:10pt;line-height:1.5;position:relative;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.55);margin:0 auto}
+.atlas-print::before{content:'';position:absolute;top:0;left:0;bottom:0;width:14mm;background:linear-gradient(160deg,#4E1178 0%,#9D20D6 55%,#793494 100%);z-index:1}
+.atlas-print::after{content:'';position:absolute;top:0;left:14mm;bottom:0;width:2mm;background:linear-gradient(90deg,#00000022,transparent);z-index:1}
+.atlas-spine{position:absolute;z-index:3;top:14mm;left:0;width:14mm;writing-mode:vertical-rl;transform:rotate(180deg);font-family:'JetBrains Mono',monospace;font-size:7pt;letter-spacing:3.5px;text-transform:uppercase;color:#C89DD9;font-weight:600;padding:8mm 2mm;opacity:.9}
+.atlas-spine b{color:#E5B454;letter-spacing:4px}
+.atlas-page{position:relative;z-index:2;padding:14mm 16mm 14mm 22mm}
+.atlas-super{display:flex;justify-content:space-between;align-items:baseline;font-family:'JetBrains Mono',monospace;font-size:8pt;letter-spacing:3px;text-transform:uppercase;color:#6B5E4A;font-weight:700;margin-bottom:14px;gap:8px;flex-wrap:wrap}
+.atlas-super .grow{margin-left:auto}
+.atlas-stamp{background:#9D20D6;color:#fff;padding:3px 10px;border-radius:2px;letter-spacing:3px;font-weight:800}
+.atlas-brand{display:flex;justify-content:space-between;align-items:baseline;padding-bottom:10px;border-bottom:1px solid #C8BEA6}
+.atlas-brand .name{font-family:'Fraunces',serif;font-size:15pt;font-weight:500;letter-spacing:.5px}
+.atlas-brand .name em{font-style:italic;color:#9D20D6;font-weight:400}
+.atlas-brand .ref{font-family:'JetBrains Mono',monospace;font-size:8.5pt;color:#6B5E4A;letter-spacing:1px}
+.atlas-title{margin:22px 0 12px}
+.atlas-title .kicker{font-family:'JetBrains Mono',monospace;font-size:8pt;letter-spacing:4px;text-transform:uppercase;color:#793494;font-weight:800;margin-bottom:10px}
+.atlas-title h1{font-family:'Fraunces',serif;font-weight:300;font-size:44pt;line-height:.92;letter-spacing:-.03em;color:#1A1208;margin:0 0 8px}
+.atlas-title h1 em{font-style:italic;color:#9D20D6;font-weight:200}
+.atlas-title .lede{font-family:'Fraunces',serif;font-weight:300;font-style:italic;font-size:12.5pt;line-height:1.5;color:#3A2C1A;max-width:82%;margin-top:8px}
+.atlas-plate{border:.4mm solid #1A1208;padding:0;display:grid;grid-template-columns:2fr 1fr 1fr;margin-top:20px}
+.atlas-plate .cell{padding:9px 12px;border-right:.25mm solid #1A1208}
+.atlas-plate .cell:last-child{border-right:none}
+.atlas-plate .k{font-family:'JetBrains Mono',monospace;font-size:7pt;letter-spacing:2.5px;text-transform:uppercase;color:#6B5E4A;font-weight:700;margin-bottom:4px}
+.atlas-plate .v{font-family:'Fraunces',serif;font-size:14pt;font-weight:500;line-height:1.05;color:#1A1208;letter-spacing:-.005em}
+.atlas-plate .v em{font-style:italic;color:#9D20D6;font-weight:400}
+.atlas-plate .v small{display:block;font-family:'JetBrains Mono',monospace;font-size:7.5pt;color:#6B5E4A;margin-top:3px;letter-spacing:.5px;font-weight:500}
+.atlas-ch{margin:26px 0 10px;display:grid;grid-template-columns:52px 1fr auto;align-items:baseline;gap:12px;break-after:avoid}
+.atlas-ch .roman{font-family:'Fraunces',serif;font-style:italic;font-weight:300;font-size:32pt;line-height:.9;color:#9D20D6;letter-spacing:-.02em}
+.atlas-ch .name{font-family:'Fraunces',serif;font-size:18pt;font-weight:400;color:#1A1208;letter-spacing:-.01em;line-height:1.05}
+.atlas-ch .name em{font-style:italic;color:#793494}
+.atlas-ch .name small{display:block;font-family:'JetBrains Mono',monospace;font-size:8pt;letter-spacing:2px;text-transform:uppercase;color:#6B5E4A;font-weight:600;margin-top:4px}
+.atlas-ch .side{font-family:'JetBrains Mono',monospace;font-size:7.5pt;letter-spacing:2.5px;text-transform:uppercase;color:#9D20D6;font-weight:800;background:#F5EFE6;padding:3px 8px;border-radius:2px;align-self:center}
+.atlas-ch .rule{grid-column:2/-1;height:1px;background:linear-gradient(90deg,#1A1208,transparent);margin-top:6px}
+.atlas-pillars{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:8px;break-inside:avoid}
+.atlas-pill{background:#FBF7EF;border:.3mm solid #1A1208;padding:10px 12px}
+.atlas-pill .k{font-family:'JetBrains Mono',monospace;font-size:7pt;letter-spacing:2.5px;text-transform:uppercase;color:#6B5E4A;font-weight:700;margin-bottom:4px}
+.atlas-pill .v{font-family:'Fraunces',serif;font-size:19pt;font-weight:500;line-height:1;color:#1A1208;letter-spacing:-.01em}
+.atlas-pill .v em{font-style:italic;color:#9D20D6;font-size:13pt;font-weight:400}
+.atlas-pill.hi{background:linear-gradient(135deg,#F5EFE6 0%,#FBF7EF 100%);border-left:3px solid #9D20D6}
+.atlas-pill.warm{border-left:3px solid #E5B454}
+.atlas-duo{display:grid;grid-template-columns:1fr 1fr;gap:0 32px;margin-top:14px;break-inside:avoid}
+.atlas-duo .col-h{font-family:'JetBrains Mono',monospace;font-size:7.5pt;letter-spacing:3px;text-transform:uppercase;color:#9D20D6;font-weight:800;padding:6px 0;margin-bottom:4px;border-bottom:.3mm solid #1A1208}
+.atlas-dl{display:grid;grid-template-columns:1fr auto;gap:0}
+.atlas-dl dt,.atlas-dl dd{padding:5px 0;border-bottom:.15mm dotted #C8BEA6}
+.atlas-dl dt{font-size:9pt;color:#3A2C1A;font-weight:500}
+.atlas-dl dd{font-family:'JetBrains Mono',monospace;font-size:9.5pt;font-weight:600;color:#1A1208;text-align:right;padding-left:8px}
+.atlas-dl dd.hi{color:#9D20D6}
+.atlas-dl dd.good{color:#0E7F4F}
+.atlas-alert{padding:9px 12px;font-size:9pt;line-height:1.4;border-left:3px solid;background:#F5EFE6;margin:5px 0}
+.atlas-alert.good{border-color:#0E7F4F;background:#EEFAF3;color:#0A5E3B}
+.atlas-alert.warn{border-color:#E5B454;background:#FFF8E8;color:#7A4F00}
+.atlas-alert.danger{border-color:#B91C1C;background:#FEF2F2;color:#8B1919}
+.atlas-alert b{font-weight:700}
+.atlas-3d{position:relative;overflow:hidden;background:linear-gradient(135deg,#0d0819 0%,#1a0f2e 60%,#0d0819 100%);height:220px;margin-top:8px;box-shadow:inset 0 0 40px rgba(157,32,214,.35);break-inside:avoid}
+.atlas-3d img{width:100%;height:100%;display:block;object-fit:cover}
+.atlas-3d .marks{position:absolute;top:14px;left:16px;font-family:'JetBrains Mono',monospace;font-size:7.5pt;letter-spacing:3px;text-transform:uppercase;color:#C89DD9;opacity:.9}
+.atlas-3d .marks span{color:#E5B454}
+.atlas-3d .label{position:absolute;bottom:12px;right:16px;font-family:'Fraunces',serif;font-style:italic;font-size:11pt;color:#C89DD9;opacity:.9}
+.atlas-notes{margin-top:14px;padding:12px 14px;background:#F5EFE6;border-left:2px solid #E5B454;font-size:9pt;line-height:1.55;color:#3A2C1A}
+.atlas-notes b{color:#1A1208;font-weight:700}
+.atlas-notes .fine{display:block;margin-top:6px;font-style:italic;color:#6B5E4A;font-size:8.5pt}
+.atlas-foot{margin-top:20px;padding-top:14px;border-top:.3mm solid #1A1208;display:flex;justify-content:space-between;align-items:baseline;font-family:'JetBrains Mono',monospace;font-size:7.5pt;letter-spacing:2px;color:#6B5E4A;text-transform:uppercase;font-weight:700;gap:10px}
+.atlas-foot .brand{font-family:'Fraunces',serif;font-style:italic;font-size:11pt;font-weight:500;text-transform:none;letter-spacing:0;color:#1A1208;text-align:center;line-height:1.2}
+.atlas-foot .brand em{color:#9D20D6}
+.atlas-foot .brand small{display:block;font-family:'JetBrains Mono',monospace;font-size:6.5pt;letter-spacing:2px;text-transform:uppercase;color:#6B5E4A;margin-top:3px;font-style:normal}
+@page{size:A4 portrait;margin:0}
+@media print{body{background:#fff;padding:0}.atlas-print{box-shadow:none;margin:0}}
 </style></head><body>
-<div class="head">
-  <div>
-    <h1>Visual Rhyme</h1>
-    <div class="sub">Structural &amp; Load Specification Report</div>
+<div class="atlas-print">
+  <div class="atlas-spine"><b>Structural Report</b> · Load · MCB · Safety · ${meta.ref}</div>
+  <div class="atlas-page">
+    <div class="atlas-super">
+      <span>Structural &amp; Load Specification · Internal to fabricator</span>
+      <span class="grow"></span>
+      <span class="atlas-stamp">Report</span>
+    </div>
+    <div class="atlas-brand">
+      <div class="name">Structural <em>Report</em></div>
+      <div class="ref">${meta.ref} · ${dateStr}</div>
+    </div>
+    <div class="atlas-title">
+      <div class="kicker">Load · MCB · Safety Factor · ${r.product.series}</div>
+      <h1>Load,<br/>wattage &amp; <em>mounting.</em></h1>
+      <div class="lede">Fabricator-facing specification for the ${r.product.series} P${r.pitch} wall — peak draw, MCB rating, load per support point and safety margin against the ${r.tubeSpec} tube spec.</div>
+    </div>
+    <div class="atlas-plate">
+      <div class="cell"><div class="k">Series · Pitch</div><div class="v"><em>${r.product.series}</em> P${r.pitch}<small>${r.product.type} · ${r.tech.ipRating||"—"}</small></div></div>
+      <div class="cell"><div class="k">Cabinet</div><div class="v">${r.cab.label}<small>${r.perCabWeightKg} kg per piece</small></div></div>
+      <div class="cell"><div class="k">Built</div><div class="v"><em>${r.areaSqft.toFixed(1)}</em> sqft<small>${r.builtWft.toFixed(2)} × ${r.builtHft.toFixed(2)} ft · ${r.totalCabs} cab</small></div></div>
+    </div>
+
+    <div class="atlas-ch">
+      <div class="roman">i</div>
+      <div class="name">The <em>headlines.</em><small>Four numbers a licensed electrician will read first</small></div>
+      <div class="side">§01</div>
+      <div class="rule"></div>
+    </div>
+    <div class="atlas-pillars">
+      <div class="atlas-pill hi"><div class="k">Peak draw</div><div class="v">${(r.peakPowerW/1000).toFixed(1)}<em> kW</em></div></div>
+      <div class="atlas-pill hi"><div class="k">MCB</div><div class="v" style="font-size:14pt">${r.mcbRating}</div></div>
+      <div class="atlas-pill warm"><div class="k">Load / point</div><div class="v">${Math.round(r.loadPerSupportKg)}<em> kg</em></div></div>
+      <div class="atlas-pill warm"><div class="k">Safety factor</div><div class="v" style="color:${sfColor}">${r.safetyFactor.toFixed(1)}<em>×</em></div></div>
+    </div>
+
+    <div class="atlas-ch">
+      <div class="roman">ii</div>
+      <div class="name">Weight &amp; <em>structure.</em><small>${r.tubeSpec} · verify &gt; 4m spans</small></div>
+      <div class="side">§02</div>
+      <div class="rule"></div>
+    </div>
+    <div class="atlas-duo">
+      <div>
+        <div class="col-h">Weight breakdown</div>
+        <dl class="atlas-dl">
+          <dt>Per cabinet</dt><dd>${r.perCabWeightKg} kg</dd>
+          <dt>Screen weight (${r.totalCabs} × ${r.perCabWeightKg})</dt><dd>${r.screenWeightKg} kg</dd>
+          <dt>Steel structure (est. 55%)</dt><dd>${r.structuralSteelKg} kg</dd>
+          <dt>Total system</dt><dd class="hi">${r.totalSystemKg} kg</dd>
+          <dt>Vertical supports</dt><dd>${r.nVerticalSupports}</dd>
+          <dt>Tube spec</dt><dd style="font-size:8.5pt">${r.tubeSpec}</dd>
+          <dt>Load per support point</dt><dd class="hi">${r.loadPerSupportKg.toFixed(1)} kg</dd>
+          <dt>Safety factor</dt><dd class="good">${r.safetyFactor.toFixed(1)}× (rated ${r.tubeWorkingLoadKg} kg/pt)</dd>
+        </dl>
+      </div>
+      <div>
+        <div class="col-h">Power &amp; electrical</div>
+        <dl class="atlas-dl">
+          <dt>Avg consumption</dt><dd>${(r.avgPowerW/1000).toFixed(2)} kW</dd>
+          <dt>Peak draw (×${r.peakFactor}, all-white)</dt><dd class="hi">${(r.peakPowerW/1000).toFixed(2)} kW</dd>
+          <dt>Peak current @ ${r.acVoltage} V</dt><dd>${r.peakCurrentA.toFixed(1)} A</dd>
+          <dt>MCB rating</dt><dd class="hi">${r.mcbRating}</dd>
+          <dt>Recommended supply</dt><dd>${r.recommendedSupplyKw} kW</dd>
+          <dt>AC input</dt><dd>100–240 V · 50/60 Hz</dd>
+          <dt>Controller ports</dt><dd>${r.ports}</dd>
+          ${cv?`<dt>Curve radius · sag</dt><dd>${(cv.R/1000).toFixed(2)} m · ${cv.sag.toFixed(0)} mm</dd>`:""}
+        </dl>
+      </div>
+    </div>
+
+    <div class="atlas-ch">
+      <div class="roman">iii</div>
+      <div class="name">Safety &amp; <em>recommendations.</em><small>Auto-generated from computed spec</small></div>
+      <div class="side">§03</div>
+      <div class="rule"></div>
+    </div>
+    ${alertHTML}
+
+    ${snapImg}
+
+    <div class="atlas-notes">
+      <b>For fabricator use.</b> These figures are pre-engineering estimates. Verify against actual site conditions (span, wind, wall type) before ordering steel. Refer to IS 875 Part 3 for wind loading calculations if the wall is outdoor or open-front.
+      <span class="fine">Structural review by licensed engineer required for spans &gt; 4m or SF &lt; 2. Peak-power values assume all-white worst case; sustained typical draw is ${(r.avgPowerW/1000).toFixed(2)} kW average.</span>
+    </div>
+
+    <div class="atlas-foot">
+      <div>${meta.ref} · Page 1 of 1</div>
+      <div class="brand">Visual Rhyme <em>Pvt. Ltd.</em><small>Powered by Microtronix Solutions</small></div>
+      <div>Ahmedabad · 382481</div>
+    </div>
   </div>
-  <div class="refbox"><div>${meta.ref}</div><div>${dateStr}</div></div>
 </div>
-<div class="meta">
-  <div><div class="lbl">Client</div><div class="val">${client||"—"}</div></div>
-  <div><div class="lbl">Project</div><div class="val">${project||"—"}</div></div>
-  <div><div class="lbl">Series</div><div class="val"><span class="badge">${r.product.series}</span></div></div>
-</div>
-<h2>Product</h2>
-<table><thead><tr><th>Pitch</th><th>Cabinet</th><th>Type</th><th>IP</th><th>Brightness</th></tr></thead>
-<tbody><tr><td>P${r.pitch}</td><td>${r.cab.label}</td><td>${r.product.type}</td><td>${r.tech.ipRating||"—"}</td><td>${r.tech.brightnessNits||"—"} nits</td></tr></tbody></table>
-<h2>Dimensions</h2>
-<table><thead><tr><th>Width</th><th>Height</th><th>Diagonal</th><th>Area</th><th>Cabinets</th></tr></thead>
-<tbody><tr><td>${r.builtWmm.toFixed(0)} mm · ${r.builtWft.toFixed(2)} ft</td><td>${r.builtHmm.toFixed(0)} mm · ${r.builtHft.toFixed(2)} ft</td><td>${r.diagInches.toFixed(1)}″</td><td>${r.areaSqft.toFixed(1)} sqft</td><td>${r.cabCountW}×${r.cabCountH} = ${r.totalCabs}</td></tr></tbody></table>
-<div class="col2">
-  <div>
-    <h2>Weight &amp; Structure</h2>
-    <div class="kv"><span class="k">Per cabinet</span><span class="v">${r.perCabWeightKg} kg</span></div>
-    <div class="kv"><span class="k">Screen weight (cabinets)</span><span class="v">${r.screenWeightKg} kg</span></div>
-    <div class="kv"><span class="k">Steel structure (est.)</span><span class="v">${r.structuralSteelKg} kg</span></div>
-    <div class="kv accent"><span class="k">Total system</span><span class="v">${r.totalSystemKg} kg</span></div>
-    <div class="kv"><span class="k">Vertical supports</span><span class="v">${r.nVerticalSupports}</span></div>
-    <div class="kv"><span class="k">Tube spec</span><span class="v">${r.tubeSpec}</span></div>
-    <div class="kv accent"><span class="k">Load per support</span><span class="v">${r.loadPerSupportKg.toFixed(1)} kg</span></div>
-    <div class="kv sf"><span class="k">Safety factor</span><span class="v">${r.safetyFactor.toFixed(1)}× (rated ${r.tubeWorkingLoadKg} kg/pt)</span></div>
-  </div>
-  <div>
-    <h2>Power &amp; Electrical</h2>
-    <div class="kv"><span class="k">Avg consumption</span><span class="v">${r.avgPowerW.toLocaleString()} W · ${(r.avgPowerW/1000).toFixed(2)} kW</span></div>
-    <div class="kv"><span class="k">Peak draw (×${r.peakFactor}, all-white)</span><span class="v">${r.peakPowerW.toLocaleString()} W · ${(r.peakPowerW/1000).toFixed(2)} kW</span></div>
-    <div class="kv"><span class="k">Peak current @ ${r.acVoltage} V</span><span class="v">${r.peakCurrentA.toFixed(1)} A</span></div>
-    <div class="kv accent"><span class="k">MCB rating (single-phase)</span><span class="v">${r.mcbRating}</span></div>
-    <div class="kv accent"><span class="k">Recommended supply</span><span class="v">${r.recommendedSupplyKw} kW</span></div>
-    <div class="kv"><span class="k">AC input</span><span class="v">100–240 V · 50/60 Hz</span></div>
-    <div class="kv"><span class="k">Controller ports</span><span class="v">${r.ports}</span></div>
-    ${cv?`<div class="kv"><span class="k">Curve radius</span><span class="v">${(cv.R/1000).toFixed(2)} m</span></div>`:""}
-    ${cv?`<div class="kv"><span class="k">Sagitta</span><span class="v">${cv.sag.toFixed(0)} mm</span></div>`:""}
-  </div>
-</div>
-<h2>Safety &amp; Recommendations</h2>
-${alertHTML}
-${snapImg}
-<div class="footer">
-  <div class="brand">Visual Rhyme Pvt. Ltd.</div>
-  <div>India's Pioneering MicroLED &amp; MiniLED Display Brand</div>
-  <div style="margin-top:5px">Generated by Pixel Quote Max · ${dateStr}</div>
-  <div style="margin-top:3px;font-size:10px">193, 9th Floor, Silver Radiance 4, off SG Highway, Gota, Ahmedabad — 382481</div>
-</div>
-<script>window.addEventListener("load",function(){setTimeout(function(){window.print();},300);});<\/script>
+<script>window.addEventListener("load",function(){setTimeout(function(){window.print();},350);});<\/script>
 </body></html>`;
     const w = window.open("", "_blank");
     if (!w) { alert("Please allow popups for Pixel Quote Max so the Structural PDF can open."); return; }
