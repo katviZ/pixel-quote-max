@@ -648,6 +648,7 @@ function numToWords(n){
    spec-sheet plates + dot-leader data + Grand Total hero pillar.
    Design DNA is the "B+C mix" mockup that Kathan approved. */
 const ATLAS_CSS = `
+em,i{font-style:normal}
 .atlas-print{background:#FBF7EF;color:#1A1208;font-family:'Manrope',sans-serif;font-size:10pt;line-height:1.5;position:relative;overflow:hidden;min-height:297mm}
 .atlas-print::before{content:'';position:absolute;top:0;left:0;bottom:0;width:14mm;background:linear-gradient(160deg,#4E1178 0%,#9D20D6 55%,#793494 100%);z-index:1}
 .atlas-print::after{content:'';position:absolute;top:0;left:14mm;bottom:0;width:2mm;background:linear-gradient(90deg,#00000022,transparent);z-index:1}
@@ -659,24 +660,24 @@ const ATLAS_CSS = `
 .atlas-stamp{background:#E5B454;color:#3A2500;padding:3px 10px;border-radius:2px;letter-spacing:3px;font-weight:800}
 .atlas-brand{display:flex;justify-content:space-between;align-items:baseline;padding-bottom:10px;border-bottom:1px solid #C8BEA6}
 .atlas-brand .name{font-family:'Fraunces',serif;font-size:15pt;font-weight:500;letter-spacing:.5px}
-.atlas-brand .name em{font-style:italic;color:#9D20D6;font-weight:400}
+.atlas-brand .name em{font-style:normal;color:#9D20D6;font-weight:400}
 .atlas-brand .ref{font-family:'JetBrains Mono',monospace;font-size:8.5pt;color:#6B5E4A;letter-spacing:1px}
 .atlas-title{margin:22px 0 12px}
 .atlas-title .kicker{font-family:'JetBrains Mono',monospace;font-size:8pt;letter-spacing:4px;text-transform:uppercase;color:#793494;font-weight:800;margin-bottom:10px}
 .atlas-title h1{font-family:'Fraunces',serif;font-weight:300;font-size:44pt;line-height:.92;letter-spacing:-.03em;color:#1A1208;margin:0 0 8px}
-.atlas-title h1 em{font-style:italic;color:#9D20D6;font-weight:200}
-.atlas-title .lede{font-family:'Fraunces',serif;font-weight:300;font-style:italic;font-size:12.5pt;line-height:1.5;color:#3A2C1A;max-width:78%;margin-top:8px}
+.atlas-title h1 em{font-style:normal;color:#9D20D6;font-weight:200}
+.atlas-title .lede{font-family:'Fraunces',serif;font-weight:300;font-style:normal;font-size:12.5pt;line-height:1.5;color:#3A2C1A;max-width:78%;margin-top:8px}
 .atlas-plate{border:.4mm solid #1A1208;padding:0;display:grid;grid-template-columns:2fr 1fr 1fr;margin-top:20px}
 .atlas-plate .cell{padding:9px 12px;border-right:.25mm solid #1A1208}
 .atlas-plate .cell:last-child{border-right:none}
 .atlas-plate .k{font-family:'JetBrains Mono',monospace;font-size:7pt;letter-spacing:2.5px;text-transform:uppercase;color:#6B5E4A;font-weight:700;margin-bottom:4px}
 .atlas-plate .v{font-family:'Fraunces',serif;font-size:14pt;font-weight:500;line-height:1.05;color:#1A1208;letter-spacing:-.005em}
-.atlas-plate .v em{font-style:italic;color:#9D20D6;font-weight:400}
+.atlas-plate .v em{font-style:normal;color:#9D20D6;font-weight:400}
 .atlas-plate .v small{display:block;font-family:'JetBrains Mono',monospace;font-size:7.5pt;color:#6B5E4A;margin-top:3px;letter-spacing:.5px;font-weight:500}
 .atlas-ch{margin:26px 0 10px;display:grid;grid-template-columns:52px 1fr auto;align-items:baseline;gap:12px;break-after:avoid}
-.atlas-ch .roman{font-family:'Fraunces',serif;font-style:italic;font-weight:300;font-size:32pt;line-height:.9;color:#9D20D6;letter-spacing:-.02em}
+.atlas-ch .roman{font-family:'Fraunces',serif;font-style:normal;font-weight:300;font-size:32pt;line-height:.9;color:#9D20D6;letter-spacing:-.02em}
 .atlas-ch .name{font-family:'Fraunces',serif;font-size:18pt;font-weight:400;color:#1A1208;letter-spacing:-.01em;line-height:1.05}
-.atlas-ch .name em{font-style:italic;color:#793494}
+.atlas-ch .name em{font-style:normal;color:#793494}
 .atlas-ch .name small{display:block;font-family:'JetBrains Mono',monospace;font-size:8pt;letter-spacing:2px;text-transform:uppercase;color:#6B5E4A;font-weight:600;margin-top:4px}
 .atlas-ch .side{font-family:'JetBrains Mono',monospace;font-size:7.5pt;letter-spacing:2.5px;text-transform:uppercase;color:#9D20D6;font-weight:800;background:#F5EFE6;padding:3px 8px;border-radius:2px;align-self:center}
 .atlas-ch .rule{grid-column:2/-1;height:1px;background:linear-gradient(90deg,#1A1208,transparent);margin-top:6px}
@@ -688,7 +689,7 @@ const ATLAS_CSS = `
 .atlas-3d img{width:100%;height:100%;display:block;object-fit:cover}
 .atlas-3d .marks{position:absolute;top:14px;left:16px;font-family:'JetBrains Mono',monospace;font-size:7.5pt;letter-spacing:3px;text-transform:uppercase;color:#C89DD9;opacity:.9}
 .atlas-3d .marks span{color:#E5B454}
-.atlas-3d .label{position:absolute;bottom:12px;right:16px;font-family:'Fraunces',serif;font-style:italic;font-size:11pt;color:#C89DD9;opacity:.9}
+.atlas-3d .label{position:absolute;bottom:12px;right:16px;font-family:'Fraunces',serif;font-style:normal;font-size:11pt;color:#C89DD9;opacity:.9}
 .atlas-duo{display:grid;grid-template-columns:1fr 1fr;gap:0 32px;margin-top:8px;break-inside:avoid}
 .atlas-duo .col-h{font-family:'JetBrains Mono',monospace;font-size:7.5pt;letter-spacing:3px;text-transform:uppercase;color:#9D20D6;font-weight:800;padding:6px 0;margin-bottom:4px;border-bottom:.3mm solid #1A1208}
 .atlas-dl{display:grid;grid-template-columns:1fr auto;gap:0;margin:0}
@@ -703,14 +704,14 @@ const ATLAS_CSS = `
 .atlas-total .fig{display:grid;grid-template-columns:1.1fr 2fr;gap:24px;align-items:baseline}
 .atlas-total .num{font-family:'Fraunces',serif;font-weight:400;font-size:44pt;line-height:.92;color:#9D20D6;letter-spacing:-.03em;display:flex;align-items:baseline;gap:4px}
 .atlas-total .num .rs{font-size:34pt;color:#793494}
-.atlas-total .words{font-family:'Fraunces',serif;font-style:italic;font-weight:300;font-size:11.5pt;line-height:1.35;color:#3A2C1A;text-transform:capitalize}
+.atlas-total .words{font-family:'Fraunces',serif;font-style:normal;font-weight:300;font-size:11.5pt;line-height:1.35;color:#3A2C1A;text-transform:capitalize}
 .atlas-total .strap{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px;padding-top:12px;border-top:.2mm solid #C8BEA6;font-family:'JetBrains Mono',monospace;font-size:8pt;letter-spacing:2px;text-transform:uppercase;color:#6B5E4A;font-weight:700}
 .atlas-total .strap b{color:#9D20D6;letter-spacing:1.5px;font-weight:800}
 .atlas-notes{margin-top:14px;padding:12px 14px;background:#F5EFE6;border-left:2px solid #E5B454;font-size:9pt;line-height:1.55;color:#3A2C1A}
 .atlas-notes b{color:#1A1208;font-weight:700}
-.atlas-notes .fine{display:block;margin-top:6px;font-style:italic;color:#6B5E4A;font-size:8.5pt}
+.atlas-notes .fine{display:block;margin-top:6px;font-style:normal;color:#6B5E4A;font-size:8.5pt}
 .atlas-foot{margin-top:20px;padding-top:14px;border-top:.3mm solid #1A1208;display:flex;justify-content:space-between;align-items:baseline;font-family:'JetBrains Mono',monospace;font-size:7.5pt;letter-spacing:2px;color:#6B5E4A;text-transform:uppercase;font-weight:700;gap:10px}
-.atlas-foot .brand{font-family:'Fraunces',serif;font-style:italic;font-size:11pt;font-weight:500;text-transform:none;letter-spacing:0;color:#1A1208;text-align:center;line-height:1.2}
+.atlas-foot .brand{font-family:'Fraunces',serif;font-style:normal;font-size:11pt;font-weight:500;text-transform:none;letter-spacing:0;color:#1A1208;text-align:center;line-height:1.2}
 .atlas-foot .brand em{color:#9D20D6}
 .atlas-foot .brand small{display:block;font-family:'JetBrains Mono',monospace;font-size:6.5pt;letter-spacing:2px;text-transform:uppercase;color:#6B5E4A;margin-top:3px;font-style:normal}
 .atlas-qtable{width:100%;border-collapse:collapse;margin-top:8px;background:#F8F4EA;border:.3mm solid #1A1208;break-inside:avoid}
@@ -725,7 +726,7 @@ const ATLAS_CSS = `
 .atlas-pill{background:#FBF7EF;border:.3mm solid #1A1208;padding:10px 12px}
 .atlas-pill .k{font-family:'JetBrains Mono',monospace;font-size:7pt;letter-spacing:2.5px;text-transform:uppercase;color:#6B5E4A;font-weight:700;margin-bottom:4px}
 .atlas-pill .v{font-family:'Fraunces',serif;font-size:19pt;font-weight:500;line-height:1;color:#1A1208;letter-spacing:-.01em}
-.atlas-pill .v em{font-style:italic;color:#9D20D6;font-size:13pt;font-weight:400}
+.atlas-pill .v em{font-style:normal;color:#9D20D6;font-size:13pt;font-weight:400}
 .atlas-pill.hi{background:linear-gradient(135deg,#F5EFE6 0%,#FBF7EF 100%);border-left:3px solid #9D20D6}
 .atlas-pill.warm{border-left:3px solid #E5B454}
 `;
@@ -1473,6 +1474,7 @@ function App(){
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,ital,wght@9..144,0,300..700;9..144,1,300..500&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
+em,i{font-style:normal}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#180d24;color:#1A1208;font-family:'Manrope',sans-serif;-webkit-font-smoothing:antialiased;padding:40px 20px}
 .atlas-print{width:210mm;min-height:297mm;background:#FBF7EF;color:#1A1208;font-family:'Manrope',sans-serif;font-size:10pt;line-height:1.5;position:relative;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.55);margin:0 auto}
@@ -1486,24 +1488,24 @@ body{background:#180d24;color:#1A1208;font-family:'Manrope',sans-serif;-webkit-f
 .atlas-stamp{background:#9D20D6;color:#fff;padding:3px 10px;border-radius:2px;letter-spacing:3px;font-weight:800}
 .atlas-brand{display:flex;justify-content:space-between;align-items:baseline;padding-bottom:10px;border-bottom:1px solid #C8BEA6}
 .atlas-brand .name{font-family:'Fraunces',serif;font-size:15pt;font-weight:500;letter-spacing:.5px}
-.atlas-brand .name em{font-style:italic;color:#9D20D6;font-weight:400}
+.atlas-brand .name em{font-style:normal;color:#9D20D6;font-weight:400}
 .atlas-brand .ref{font-family:'JetBrains Mono',monospace;font-size:8.5pt;color:#6B5E4A;letter-spacing:1px}
 .atlas-title{margin:22px 0 12px}
 .atlas-title .kicker{font-family:'JetBrains Mono',monospace;font-size:8pt;letter-spacing:4px;text-transform:uppercase;color:#793494;font-weight:800;margin-bottom:10px}
 .atlas-title h1{font-family:'Fraunces',serif;font-weight:300;font-size:44pt;line-height:.92;letter-spacing:-.03em;color:#1A1208;margin:0 0 8px}
-.atlas-title h1 em{font-style:italic;color:#9D20D6;font-weight:200}
-.atlas-title .lede{font-family:'Fraunces',serif;font-weight:300;font-style:italic;font-size:12.5pt;line-height:1.5;color:#3A2C1A;max-width:82%;margin-top:8px}
+.atlas-title h1 em{font-style:normal;color:#9D20D6;font-weight:200}
+.atlas-title .lede{font-family:'Fraunces',serif;font-weight:300;font-style:normal;font-size:12.5pt;line-height:1.5;color:#3A2C1A;max-width:82%;margin-top:8px}
 .atlas-plate{border:.4mm solid #1A1208;padding:0;display:grid;grid-template-columns:2fr 1fr 1fr;margin-top:20px}
 .atlas-plate .cell{padding:9px 12px;border-right:.25mm solid #1A1208}
 .atlas-plate .cell:last-child{border-right:none}
 .atlas-plate .k{font-family:'JetBrains Mono',monospace;font-size:7pt;letter-spacing:2.5px;text-transform:uppercase;color:#6B5E4A;font-weight:700;margin-bottom:4px}
 .atlas-plate .v{font-family:'Fraunces',serif;font-size:14pt;font-weight:500;line-height:1.05;color:#1A1208;letter-spacing:-.005em}
-.atlas-plate .v em{font-style:italic;color:#9D20D6;font-weight:400}
+.atlas-plate .v em{font-style:normal;color:#9D20D6;font-weight:400}
 .atlas-plate .v small{display:block;font-family:'JetBrains Mono',monospace;font-size:7.5pt;color:#6B5E4A;margin-top:3px;letter-spacing:.5px;font-weight:500}
 .atlas-ch{margin:26px 0 10px;display:grid;grid-template-columns:52px 1fr auto;align-items:baseline;gap:12px;break-after:avoid}
-.atlas-ch .roman{font-family:'Fraunces',serif;font-style:italic;font-weight:300;font-size:32pt;line-height:.9;color:#9D20D6;letter-spacing:-.02em}
+.atlas-ch .roman{font-family:'Fraunces',serif;font-style:normal;font-weight:300;font-size:32pt;line-height:.9;color:#9D20D6;letter-spacing:-.02em}
 .atlas-ch .name{font-family:'Fraunces',serif;font-size:18pt;font-weight:400;color:#1A1208;letter-spacing:-.01em;line-height:1.05}
-.atlas-ch .name em{font-style:italic;color:#793494}
+.atlas-ch .name em{font-style:normal;color:#793494}
 .atlas-ch .name small{display:block;font-family:'JetBrains Mono',monospace;font-size:8pt;letter-spacing:2px;text-transform:uppercase;color:#6B5E4A;font-weight:600;margin-top:4px}
 .atlas-ch .side{font-family:'JetBrains Mono',monospace;font-size:7.5pt;letter-spacing:2.5px;text-transform:uppercase;color:#9D20D6;font-weight:800;background:#F5EFE6;padding:3px 8px;border-radius:2px;align-self:center}
 .atlas-ch .rule{grid-column:2/-1;height:1px;background:linear-gradient(90deg,#1A1208,transparent);margin-top:6px}
@@ -1511,7 +1513,7 @@ body{background:#180d24;color:#1A1208;font-family:'Manrope',sans-serif;-webkit-f
 .atlas-pill{background:#FBF7EF;border:.3mm solid #1A1208;padding:10px 12px}
 .atlas-pill .k{font-family:'JetBrains Mono',monospace;font-size:7pt;letter-spacing:2.5px;text-transform:uppercase;color:#6B5E4A;font-weight:700;margin-bottom:4px}
 .atlas-pill .v{font-family:'Fraunces',serif;font-size:19pt;font-weight:500;line-height:1;color:#1A1208;letter-spacing:-.01em}
-.atlas-pill .v em{font-style:italic;color:#9D20D6;font-size:13pt;font-weight:400}
+.atlas-pill .v em{font-style:normal;color:#9D20D6;font-size:13pt;font-weight:400}
 .atlas-pill.hi{background:linear-gradient(135deg,#F5EFE6 0%,#FBF7EF 100%);border-left:3px solid #9D20D6}
 .atlas-pill.warm{border-left:3px solid #E5B454}
 .atlas-duo{display:grid;grid-template-columns:1fr 1fr;gap:0 32px;margin-top:14px;break-inside:avoid}
@@ -1531,12 +1533,12 @@ body{background:#180d24;color:#1A1208;font-family:'Manrope',sans-serif;-webkit-f
 .atlas-3d img{width:100%;height:100%;display:block;object-fit:cover}
 .atlas-3d .marks{position:absolute;top:14px;left:16px;font-family:'JetBrains Mono',monospace;font-size:7.5pt;letter-spacing:3px;text-transform:uppercase;color:#C89DD9;opacity:.9}
 .atlas-3d .marks span{color:#E5B454}
-.atlas-3d .label{position:absolute;bottom:12px;right:16px;font-family:'Fraunces',serif;font-style:italic;font-size:11pt;color:#C89DD9;opacity:.9}
+.atlas-3d .label{position:absolute;bottom:12px;right:16px;font-family:'Fraunces',serif;font-style:normal;font-size:11pt;color:#C89DD9;opacity:.9}
 .atlas-notes{margin-top:14px;padding:12px 14px;background:#F5EFE6;border-left:2px solid #E5B454;font-size:9pt;line-height:1.55;color:#3A2C1A}
 .atlas-notes b{color:#1A1208;font-weight:700}
-.atlas-notes .fine{display:block;margin-top:6px;font-style:italic;color:#6B5E4A;font-size:8.5pt}
+.atlas-notes .fine{display:block;margin-top:6px;font-style:normal;color:#6B5E4A;font-size:8.5pt}
 .atlas-foot{margin-top:20px;padding-top:14px;border-top:.3mm solid #1A1208;display:flex;justify-content:space-between;align-items:baseline;font-family:'JetBrains Mono',monospace;font-size:7.5pt;letter-spacing:2px;color:#6B5E4A;text-transform:uppercase;font-weight:700;gap:10px}
-.atlas-foot .brand{font-family:'Fraunces',serif;font-style:italic;font-size:11pt;font-weight:500;text-transform:none;letter-spacing:0;color:#1A1208;text-align:center;line-height:1.2}
+.atlas-foot .brand{font-family:'Fraunces',serif;font-style:normal;font-size:11pt;font-weight:500;text-transform:none;letter-spacing:0;color:#1A1208;text-align:center;line-height:1.2}
 .atlas-foot .brand em{color:#9D20D6}
 .atlas-foot .brand small{display:block;font-family:'JetBrains Mono',monospace;font-size:6.5pt;letter-spacing:2px;text-transform:uppercase;color:#6B5E4A;margin-top:3px;font-style:normal}
 @page{size:A4 portrait;margin:0}
@@ -1897,7 +1899,7 @@ body{background:#180d24;color:#1A1208;font-family:'Manrope',sans-serif;-webkit-f
                   <div style={{padding:12,background:C.navy,borderRadius:6}}><div style={{fontSize:10,color:C.lavender,opacity:.7,letterSpacing:1.2,textTransform:"uppercase"}}>Steel weight</div><div style={{fontFamily:FR,fontSize:20,color:C.cream,marginTop:4}}>~{num(cv.steelWeightKg,0)} kg</div></div>
                   <div style={{padding:12,background:C.navy,borderRadius:6}}><div style={{fontSize:10,color:C.lavender,opacity:.7,letterSpacing:1.2,textTransform:"uppercase"}}>Recommended supply</div><div style={{fontFamily:FR,fontSize:20,color:C.magenta,marginTop:4}}>{num(cv.recommendedSupply)} kW</div></div>
                 </div>
-                <p style={{fontSize:11,lineHeight:1.5,color:C.amber,opacity:.7,marginTop:12,fontStyle:"italic",borderTop:`1px dashed ${C.line}`,paddingTop:10}}>
+                <p style={{fontSize:11,lineHeight:1.5,color:C.amber,opacity:.7,marginTop:12,fontStyle:"normal",borderTop:`1px dashed ${C.line}`,paddingTop:10}}>
                   Pre-engineering estimates for scoping only. Final structural design, anchor specification and wind-load verification must be stamped by a licensed structural engineer (IS 875 Part 3 for wind in India).
                 </p>
               </Panel>
@@ -1949,7 +1951,7 @@ body{background:#180d24;color:#1A1208;font-family:'Manrope',sans-serif;-webkit-f
             <div style={{fontSize:10.5,color:C.lavender,opacity:.55,marginBottom:5}}>⚠ This is a tool — it can make mistakes. Verify every quote before sharing or ordering.</div>
             <div style={{fontFamily:MO,fontSize:10,color:C.lavender,opacity:.5,letterSpacing:1.2}}>© {new Date().getFullYear()} Visual Rhyme Pvt. Ltd. · Kathan Mehta · All rights reserved.</div>
           </div>
-          <div style={{position:"absolute",right:8,bottom:6,fontSize:9.5,color:C.lavender,opacity:.4,letterSpacing:.6,fontStyle:"italic"}}>Powered by Microtronix Solutions</div>
+          <div style={{position:"absolute",right:8,bottom:6,fontSize:9.5,color:C.lavender,opacity:.4,letterSpacing:.6,fontStyle:"normal"}}>Powered by Microtronix Solutions</div>
         </div>
       </div>
 
