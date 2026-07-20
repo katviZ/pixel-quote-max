@@ -80,7 +80,7 @@
       <pitch pp="2.5"  rate="7500"  gst="18" sku="Reyansh Indoor P2.5" />
       <pitch pp="2"    rate="9500"  gst="18" sku="Reyansh Indoor P2 (SMD)" />
       <pitch pp="1.86" rate="10500" gst="18" sku="Reyansh Indoor P1.86" />
-      <pitch pp="1.56" rate="23000" gst="28" sku="Reyansh Indoor P1.56" />
+      <pitch pp="1.56" rate="23000" gst="18" sku="Reyansh Indoor P1.56" />
     </product>
 
     <product id="microled" series="Leynna Cosmo" type="MicroLED" env="indoor" moduleW="300" moduleH="168.75"
@@ -93,11 +93,11 @@
              lifespanHours="100000" opTempMin="0" opTempMax="40" vdMultiplier="1.5">
       <cabinet w="600"   h="337.5" label="600×337.5mm" weight="5" />
       <cabinet w="609.6" h="342.9" label="609.6×342.9mm" weight="5" />
-      <pitch pp="1.56" rate="23000" gst="28" sku="Leynna Cosmo P1.56" />
-      <pitch pp="1.25" rate="25000" gst="28" sku="Leynna Cosmo P1.25" />
-      <pitch pp="1.17" rate="23500" gst="28" sku="Leynna Cosmo P1.17" />
-      <pitch pp="0.93" rate="35000" gst="28" sku="Leynna Cosmo P0.93 Virtual" />
-      <pitch pp="0.78" rate="60000" gst="28" sku="Leynna Cosmo P0.78" />
+      <pitch pp="1.56" rate="23000" gst="18" sku="Leynna Cosmo P1.56" />
+      <pitch pp="1.25" rate="25000" gst="18" sku="Leynna Cosmo P1.25" />
+      <pitch pp="1.17" rate="23500" gst="18" sku="Leynna Cosmo P1.17" />
+      <pitch pp="0.93" rate="35000" gst="18" sku="Leynna Cosmo P0.93 Virtual" />
+      <pitch pp="0.78" rate="60000" gst="18" sku="Leynna Cosmo P0.78" />
     </product>
 
     <product id="sapphire" series="Leynna Sapphire" type="MicroLED" env="indoor" moduleW="300" moduleH="168.75"
@@ -110,9 +110,9 @@
              lifespanHours="100000" opTempMin="0" opTempMax="40" vdMultiplier="1.5">
       <cabinet w="600"   h="337.5" label="600×337.5mm"   weight="5" />
       <cabinet w="609.6" h="342.9" label="609.6×342.9mm" weight="5" />
-      <pitch pp="1.53" rate="37800" gst="28" sku="Leynna Sapphire P1.53" />
-      <pitch pp="1.23" rate="42000" gst="28" sku="Leynna Sapphire P1.23" />
-      <pitch pp="0.95" rate="66000" gst="28" sku="Leynna Sapphire P0.95" />
+      <pitch pp="1.53" rate="37800" gst="18" sku="Leynna Sapphire P1.53" />
+      <pitch pp="1.23" rate="42000" gst="18" sku="Leynna Sapphire P1.23" />
+      <pitch pp="0.95" rate="66000" gst="18" sku="Leynna Sapphire P0.95" />
     </product>
 
   </products>
