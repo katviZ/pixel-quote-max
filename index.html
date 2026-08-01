@@ -747,7 +747,7 @@ function PrintSheet({r,meta,preview,threeDSnapshot}){
       <div className="atlas-page">
 
         <div className="atlas-super">
-          <span>Visual Rhyme Pvt. Ltd. · Ahmedabad</span>
+          <span>Visual Rhyme · Ahmedabad</span>
           <span className="grow"></span>
           <span className="atlas-stamp">Quotation</span>
         </div>
@@ -949,7 +949,7 @@ function PrintSheet({r,meta,preview,threeDSnapshot}){
           <div className="strap">
             <span>Validity · <b>7 days</b></span>
             <span>Payment · <b>60 / 30 / 10</b></span>
-            <span>Warranty · <b>3 years</b></span>
+            <span>Warranty · <b>2 years</b></span>
           </div>
         </div>
 
@@ -961,7 +961,7 @@ function PrintSheet({r,meta,preview,threeDSnapshot}){
 
         <div className="atlas-foot">
           <div>{meta.ref} · Page 1 of 1</div>
-          <div className="brand">Visual Rhyme <em>Pvt. Ltd.</em><small>Powered by Microtronix Solutions</small></div>
+          <div className="brand">Visual Rhyme<small>Powered by Microtronix Solutions · GSTIN 24AAWFM3775A1Z4</small></div>
           <div>Ahmedabad · 382481</div>
         </div>
       </div>
@@ -1155,7 +1155,7 @@ function Gate({ onAgree }){
         <div style={bullet}><span style={dot}>•</span><span>For estimation and scoping only. Prices are indicative and subject to confirmation by Visual Rhyme.</span></div>
         <div style={bullet}><span style={dot}>•</span><span>Curved-screen structural, steel and power figures are pre-engineering estimates and must be verified by a licensed structural engineer (IS 875 Pt 3 for wind in India) before fabrication.</span></div>
         <div style={bullet}><span style={dot}>•</span><span>Your inputs are stored locally in this browser to restore your session. If you request a callback, the name and phone you provide are sent to Visual Rhyme.</span></div>
-        <div style={bullet}><span style={dot}>•</span><span>The tool, its calculations and outputs are the property of Visual Rhyme Pvt. Ltd. and may not be redistributed without permission.</span></div>
+        <div style={bullet}><span style={dot}>•</span><span>The tool, its calculations and outputs are the property of Microtronix Solutions (Visual Rhyme) and may not be redistributed without permission.</span></div>
 
         <label style={{display:"flex",gap:9,alignItems:"flex-start",margin:"16px 0 14px",cursor:"pointer",fontSize:13,color:C.lavender}}>
           <input type="checkbox" checked={checked} onChange={e=>setChecked(e.target.checked)} style={{marginTop:2,accentColor:C.magenta,width:16,height:16,flexShrink:0}}/>
@@ -1168,7 +1168,7 @@ function Gate({ onAgree }){
         </button>
 
         <div style={{textAlign:"center",marginTop:14,fontSize:10.5,color:C.lavender,opacity:.6,lineHeight:1.5}}>
-          © {new Date().getFullYear()} Visual Rhyme Pvt. Ltd. · Kathan Mehta · All rights reserved.
+          © {new Date().getFullYear()} Microtronix Solutions · Visual Rhyme · Kathan Mehta · All rights reserved.
         </div>
       </div>
     </div>
@@ -1632,7 +1632,7 @@ body{background:#180d24;color:#1A1208;font-family:'Manrope',sans-serif;-webkit-f
 
     <div class="atlas-foot">
       <div>${meta.ref} · Page 1 of 1</div>
-      <div class="brand">Visual Rhyme <em>Pvt. Ltd.</em><small>Powered by Microtronix Solutions</small></div>
+      <div class="brand">Visual Rhyme<small>Powered by Microtronix Solutions · GSTIN 24AAWFM3775A1Z4</small></div>
       <div>Ahmedabad · 382481</div>
     </div>
   </div>
@@ -1687,7 +1687,7 @@ body{background:#180d24;color:#1A1208;font-family:'Manrope',sans-serif;-webkit-f
       `%0AResolution: ${r.pxW}×${r.pxH}px` +
       `%0A*Grand Total: ${E.fmtINR(r.grandTotal).replace("₹","Rs.")}* (incl. GST)` +
       `%0A%0AConfigure / share: ${encodeURIComponent(link)}` +
-      `%0A%0A— Visual Rhyme Pvt. Ltd.`;
+      `%0A%0A— Visual Rhyme`;
     window.open("https://wa.me/?text="+txt,"_blank");
   };
 
@@ -1949,9 +1949,9 @@ body{background:#180d24;color:#1A1208;font-family:'Manrope',sans-serif;-webkit-f
         <div style={{padding:"22px 0 8px",borderTop:`1px solid ${C.line}`,marginTop:22,position:"relative"}}>
           <div style={{textAlign:"center"}}>
             <div style={{fontSize:10.5,color:C.lavender,opacity:.55,marginBottom:5}}>⚠ This is a tool — it can make mistakes. Verify every quote before sharing or ordering.</div>
-            <div style={{fontFamily:MO,fontSize:10,color:C.lavender,opacity:.5,letterSpacing:1.2}}>© {new Date().getFullYear()} Visual Rhyme Pvt. Ltd. · Kathan Mehta · All rights reserved.</div>
+            <div style={{fontFamily:MO,fontSize:10,color:C.lavender,opacity:.5,letterSpacing:1.2}}>© {new Date().getFullYear()} Microtronix Solutions · Visual Rhyme · Kathan Mehta · All rights reserved.</div>
           </div>
-          <div style={{position:"absolute",right:8,bottom:6,fontSize:9.5,color:C.lavender,opacity:.4,letterSpacing:.6,fontStyle:"normal"}}>Powered by Microtronix Solutions</div>
+          <div style={{position:"absolute",right:8,bottom:6,fontSize:9.5,color:C.lavender,opacity:.4,letterSpacing:.6,fontStyle:"normal"}}>Powered by Microtronix Solutions · GSTIN 24AAWFM3775A1Z4</div>
         </div>
       </div>
 

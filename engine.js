@@ -166,9 +166,15 @@
     const reqWmm = Math.round(ftToMm(params.widthFt) * 1000) / 1000;
     const reqHmm = Math.round(ftToMm(params.heightFt) * 1000) / 1000;
 
-    // snap UP to whole cabinets (you build & quote whole cabinets)
-    const cabCountW = Math.max(1, Math.ceil(reqWmm / cabW));
-    const cabCountH = Math.max(1, Math.ceil(reqHmm / cabH));
+    // snap UP to whole cabinets (you build & quote whole cabinets).
+    // CEIL_TOLERANCE_MM absorbs sub-3mm drift from ft↔mm round-trips (e.g.
+    // clicking "Optimal Fit" stores widthFt = 12.60 (from 12.5984), which
+    // round-trips to 3840.48 mm — a bare ceil() would snap that to 7 cabs
+    // instead of 6, then clicking Optimal again would balloon to 14.70 ft.
+    // 3mm is invisible against physical LED tolerances but kills the drift.
+    const CEIL_TOLERANCE_MM = 3;
+    const cabCountW = Math.max(1, Math.ceil((reqWmm - CEIL_TOLERANCE_MM) / cabW));
+    const cabCountH = Math.max(1, Math.ceil((reqHmm - CEIL_TOLERANCE_MM) / cabH));
     const builtWmm = cabCountW * cabW;
     const builtHmm = cabCountH * cabH;
     const totalCabs = cabCountW * cabCountH;
