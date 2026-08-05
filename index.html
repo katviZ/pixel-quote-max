@@ -949,7 +949,7 @@ function PrintSheet({r,meta,preview,threeDSnapshot}){
           <div className="strap">
             <span>Validity · <b>7 days</b></span>
             <span>Payment · <b>60 / 30 / 10</b></span>
-            <span>Warranty · <b>2 years</b></span>
+            <span>Warranty · <b>{(r.tech && r.tech.warrantyYears) || 2} years</b></span>
           </div>
         </div>
 

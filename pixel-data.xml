@@ -53,7 +53,7 @@
              viewingAngleDeg="155" contrastStatic="6000" contrastDynamic="200000"
              colorGamutSrgbPct="110" colorGamutRec2020Pct="85"
              ipRating="IP65" maxPowerSqm="800" avgPowerSqm="500"
-             warrantyYears="5" cabinetDepthMm="75" moduleDepthMm="16"
+             warrantyYears="2" cabinetDepthMm="75" moduleDepthMm="16"
              lifespanHours="100000" opTempMin="-10" opTempMax="50" vdMultiplier="1.0">
       <cabinet w="320"  h="160"  label="320×160mm Module" weight="1.5" type="module" />
       <cabinet w="640"  h="640"  label="640×640mm"   weight="8" />
@@ -89,7 +89,7 @@
              viewingAngleDeg="175" contrastStatic="10000" contrastDynamic="350000"
              colorGamutSrgbPct="130" colorGamutRec2020Pct="75"
              ipRating="IP54" maxPowerSqm="350" avgPowerSqm="200"
-             warrantyYears="3" cabinetDepthMm="45" moduleDepthMm="14"
+             warrantyYears="2" cabinetDepthMm="45" moduleDepthMm="14"
              lifespanHours="100000" opTempMin="0" opTempMax="40" vdMultiplier="1.5">
       <cabinet w="600"   h="337.5" label="600×337.5mm" weight="5" />
       <cabinet w="609.6" h="342.9" label="609.6×342.9mm" weight="5" />
