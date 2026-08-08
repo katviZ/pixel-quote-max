@@ -731,239 +731,322 @@ em,i{font-style:normal}
 .atlas-pill.warm{border-left:3px solid #E5B454}
 `;
 
+/* Derive a full accent-color family from any single hex.
+ * When a dealer is logged in we swap the VR purple family for the dealer's own
+ * brand color so the exported PDF looks like a first-party document — no more
+ * purple on an Arha teal quote. Neutral colors (cream/gold/ink) stay put.
+ *
+ * Given base #0078A8 (Arha teal), returns:
+ *   base    = #0078A8   → replaces #9D20D6 (main magenta)
+ *   deep    = darker    → replaces #793494 (deep purple accent)
+ *   darkest = darker×2  → replaces #4E1178 (spine gradient top)
+ *   light   = lighter   → replaces #C89DD9 (lavender text)
+ */
+function deriveBrand(hex){
+  const h = (hex||"#9D20D6").replace("#","");
+  const r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16);
+  const clamp = v => Math.max(0, Math.min(255, Math.round(v)));
+  const toHex = v => clamp(v).toString(16).padStart(2,"0");
+  const shade = (dr,dg,db) => "#"+toHex(dr)+toHex(dg)+toHex(db);
+  const darken = (f) => shade(r*(1-f), g*(1-f), b*(1-f));
+  const lighten = (f) => shade(r+(255-r)*f, g+(255-g)*f, b+(255-b)*f);
+  return {
+    base:    "#"+h.toUpperCase(),
+    deep:    darken(0.25),
+    darkest: darken(0.45),
+    light:   lighten(0.55),
+    soft:    lighten(0.78),   // .soft box background (hl table rows)
+    bg:      lighten(0.94),   // .bg subtle backgrounds (striped rows, tiles)
+    line:    lighten(0.86),   // borders + divider lines
+  };
+}
+
+/* Apply dealer accent to any CSS string via exact-hex replacement of the
+ * VR purple family. Neutral is a no-op. Works on both ATLAS_CSS (quote PDF)
+ * and the structural PDF's inline CSS template literal. */
+function applyBrandTheme(css, dealer){
+  if (!dealer || !dealer.brandColor) return css;
+  const s = deriveBrand(dealer.brandColor);
+  return css
+    .replaceAll("#9D20D6", s.base)
+    .replaceAll("#9d20d6", s.base)
+    .replaceAll("#793494", s.deep)
+    .replaceAll("#4E1178", s.darkest)
+    .replaceAll("#C89DD9", s.light);
+}
+function themeAtlasCSS(dealer){ return applyBrandTheme(ATLAS_CSS, dealer); }
+
+/* HOUSE CSS — matches the design Kathan uses for hand-built Quote_PQM
+ * quotes (Segoe UI, clean tables, purple accent bar, .band/.tile/.note
+ * callouts). This replaces the Atlas magazine layout on the exported quote.
+ * Themed per-dealer by swapping the :root color block. */
+const HOUSE_CSS = `
+:root{ --p:#9D20D6; --v:#7A15AF; --deep:#5b0f8f; --ink:#1c1622; --grey:#5a5566; --line:#e6e0ee; --bg:#faf8fd; --soft:#f3e6fb; --green:#0d9152; --greenbg:#e8f6ee; --amber:#b8791a; --amberbg:#fbf1df; }
+*{margin:0;padding:0;box-sizing:border-box;}
+.vr-house{font-family:'Segoe UI',Arial,sans-serif;color:var(--ink);font-size:9.4pt;line-height:1.45;background:#fff;}
+.vr-house em,.vr-house i{font-style:normal;}
+@page{size:A4 portrait;margin:0;}
+.vr-house .page{width:210mm;min-height:297mm;padding:11mm 14mm 15mm;position:relative;overflow:hidden;background:#fff;}
+@media print{.vr-house{-webkit-print-color-adjust:exact;print-color-adjust:exact;}.vr-house .page{page-break-after:always;}.vr-house .page:last-child{page-break-after:auto;}}
+.vr-house header{display:flex;align-items:center;justify-content:space-between;border-bottom:2.5px solid var(--p);padding-bottom:3mm;margin-bottom:4mm;gap:6mm;}
+.vr-house .brand{display:flex;align-items:center;gap:3mm;}
+.vr-house .brand img{height:11mm;width:auto;object-fit:contain;}
+.vr-house .brand .nm{font-size:13pt;font-weight:800;letter-spacing:.5px;color:var(--ink);}
+.vr-house .brand .nm span{color:var(--p);}
+.vr-house .brand .sub{font-size:7pt;color:var(--grey);letter-spacing:.3px;margin-top:.6mm;}
+.vr-house .meta{text-align:right;font-size:7.8pt;color:var(--grey);line-height:1.5;white-space:nowrap;}
+.vr-house .meta .dt{font-size:11pt;font-weight:800;color:var(--p);letter-spacing:.6px;}
+.vr-house .meta b{color:var(--ink);}
+.vr-house h1{font-size:16pt;font-weight:800;color:var(--deep);line-height:1.15;}
+.vr-house h1 span{color:var(--p);}
+.vr-house .subtitle{font-size:8.8pt;color:var(--grey);margin:1mm 0 2.5mm;}
+.vr-house h2{font-size:10.6pt;font-weight:800;color:var(--v);margin:3.4mm 0 1.3mm;border-left:4px solid var(--p);padding-left:2.8mm;}
+.vr-house h3{font-size:9.2pt;font-weight:700;color:var(--deep);margin:2.2mm 0 .8mm;}
+.vr-house p{margin-bottom:1.6mm;color:#39333f;}
+.vr-house ul{margin:.4mm 0 2mm 5mm;} .vr-house li{margin-bottom:.7mm;color:#39333f;font-size:8.5pt;}
+.vr-house table{width:100%;border-collapse:collapse;margin:1mm 0 2.2mm;font-size:8.4pt;}
+.vr-house th{background:var(--ink);color:#fff;text-align:left;padding:1.4mm 2.2mm;font-weight:600;}
+.vr-house td{padding:1.35mm 2.2mm;border-bottom:1px solid var(--line);vertical-align:top;}
+.vr-house tr:nth-child(even) td{background:var(--bg);}
+.vr-house td.k{font-weight:700;color:var(--v);white-space:nowrap;width:34%;}
+.vr-house td.num,.vr-house th.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+.vr-house tr.hl td{background:var(--soft)!important;font-weight:700;}
+.vr-house .tiles{display:flex;gap:2.5mm;margin:2.5mm 0;flex-wrap:wrap;}
+.vr-house .tile{flex:1;min-width:28mm;border:1px solid var(--line);border-top:3px solid var(--p);border-radius:2mm;padding:2.2mm 2.6mm;background:var(--bg);}
+.vr-house .tile .k{font-size:6.5pt;text-transform:uppercase;letter-spacing:.6px;color:var(--grey);}
+.vr-house .tile .v{font-size:10pt;font-weight:800;margin-top:.6mm;white-space:nowrap;color:var(--ink);}
+.vr-house .two{display:flex;gap:4mm;} .vr-house .two>div{flex:1;}
+.vr-house .note{background:var(--bg);border-left:3px solid var(--p);padding:1.9mm 3mm;font-size:8.4pt;color:#39333f;margin:1.8mm 0;border-radius:0 1.5mm 1.5mm 0;}
+.vr-house .note b{color:var(--ink);}
+.vr-house .ok{background:var(--greenbg);border-left:3px solid var(--green);padding:1.9mm 3mm;font-size:8.4pt;color:#1c4a33;margin:1.8mm 0;border-radius:0 1.5mm 1.5mm 0;}
+.vr-house .ok b{color:var(--green);}
+.vr-house .warn{background:var(--amberbg);border-left:3px solid var(--amber);padding:1.9mm 3mm;font-size:8.4pt;color:#5c3d0a;margin:1.8mm 0;border-radius:0 1.5mm 1.5mm 0;}
+.vr-house .warn b{color:var(--amber);}
+.vr-house .band{background:linear-gradient(90deg,var(--deep),var(--p));color:#fff;border-radius:2.5mm;padding:3mm 5mm;margin:2mm 0;display:flex;justify-content:space-between;align-items:center;}
+.vr-house .band .l{font-size:8pt;letter-spacing:1.2px;text-transform:uppercase;opacity:.9;}
+.vr-house .band .r{font-size:15pt;font-weight:800;font-variant-numeric:tabular-nums;}
+.vr-house .mock{margin:1.6mm 0 1mm;border:1px solid var(--line);border-radius:2.5mm;overflow:hidden;background:#1a0f2e;padding:3mm;}
+.vr-house .mock.img-only{background:#fff;padding:0;}
+.vr-house .mock.img-only img{display:block;width:100%;}
+.vr-house .mockcap{font-size:7.3pt;color:var(--grey);text-align:center;margin-top:.8mm;letter-spacing:.3px;}
+.vr-house footer{margin-top:6mm;display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:1.7mm;font-size:7pt;color:var(--grey);gap:3mm;white-space:nowrap;}
+.vr-house footer .pw{background:var(--p);color:#fff;font-weight:700;font-size:7pt;letter-spacing:.3px;padding:.9mm 3.2mm;border-radius:2mm;}
+`;
+
+function themeHouseCSS(dealer){
+  if (!dealer || !dealer.brandColor) return HOUSE_CSS;
+  const s = deriveBrand(dealer.brandColor);
+  return HOUSE_CSS.replace(/:root\{[^}]*\}/,
+    `:root{ --p:${s.base}; --v:${s.deep}; --deep:${s.darkest}; --ink:#1c1622; --grey:#5a5566; --line:${s.line}; --bg:${s.bg}; --soft:${s.soft}; --green:#0d9152; --greenbg:#e8f6ee; --amber:#b8791a; --amberbg:#fbf1df; }`);
+}
+
 function PrintSheet({r,meta,preview,threeDSnapshot}){
   if(!r) return null;
   const cv=r.curve;
   const isCurved=r.mode==="curved";
-  const sfColor=r.safetyFactor>=2?"#0E7F4F":r.safetyFactor>=1.5?"#B45309":"#B91C1C";
-  const romans=["i","ii","iii","iv","v","vi","vii","viii","ix"];
-  let ci=0;
-  const R=()=>romans[ci++];
-  const S=()=>"§0"+ci;
+  const sfColor=r.safetyFactor>=2?"#0d9152":r.safetyFactor>=1.5?"#b8791a":"#b91c1c";
+  const warranty=(r.tech && r.tech.warrantyYears) || 2;
   return (
-    <div className={preview?"atlas-print":"vr-print atlas-print"} style={{display:preview?"block":undefined}}>
-      <style dangerouslySetInnerHTML={{__html:ATLAS_CSS}}/>
-      <div className="atlas-spine"><b>Visual Rhyme</b> · {isCurved?"Curved Quotation":"Quotation"} · {meta.ref}</div>
-      <div className="atlas-page">
-
-        <div className="atlas-super">
-          <span>Visual Rhyme · Ahmedabad</span>
-          <span className="grow"></span>
-          <span className="atlas-stamp">Quotation</span>
-        </div>
-        <div className="atlas-brand">
-          <div className="name">Pixel Quote <em>Max</em></div>
-          <div className="ref">{meta.ref} · {meta.date}</div>
-        </div>
-
-        <div className="atlas-title">
-          <div className="kicker">{r.product.series} · {isCurved?"Curved":"Flat"} LED · P{r.pitch}</div>
-          <h1>{meta.project||"LED"}<br/><em>{isCurved?"Curved Wall.":"Quote."}</em></h1>
-          <div className="lede">A {r.product.series} P{r.pitch} {r.product.type} wall, {num(r.builtWft,1)} by {num(r.builtHft,1)} feet, delivered and installed{meta.client?" for "+meta.client:""}.</div>
-        </div>
-
-        <div className="atlas-plate">
-          <div className="cell"><div className="k">Client</div><div className="v">{meta.client||"—"}<small>{meta.project||"Untitled project"}</small></div></div>
-          <div className="cell"><div className="k">Series</div><div className="v">{r.product.series}<small>{r.product.type} · {r.tech.ipRating||"—"}</small></div></div>
-          <div className="cell"><div className="k">Pitch</div><div className="v"><em>P{r.pitch}</em><small>{r.cab.label}{r.cabW!==r.cab.w?" ↺":""}</small></div></div>
-        </div>
-
-        <div className="atlas-ch">
-          <div className="roman">{R()}</div>
-          <div className="name">{isCurved?"Elevation, plan & ":"Elevation"} <em>{isCurved?"section.":"& drawings."}</em><small>Snapped to whole cabinets · dimensions verified</small></div>
-          <div className="side">{S()}</div>
-          <div className="rule"/>
-        </div>
-        <div className="atlas-draw">
-          <div className="cap top"><span>DRAWING · ELEV-01</span><span>SCALE 1:80 · A4</span></div>
-          <ElevationDrawing wmm={r.builtWmm} hmm={r.builtHmm} cabCountW={r.cabCountW} cabCountH={r.cabCountH} modPerCabW={r.modPerCabW} modPerCabH={r.modPerCabH}/>
-          <div className="cap bot"><span>{r.cabCountW} × {r.cabCountH} = {r.totalCabs} cabinets · {num(r.totalMods)} modules</span><span>Elevation view</span></div>
-        </div>
-        {isCurved && (<>
-          <div className="atlas-draw">
-            <div className="cap top"><span>DRAWING · PLAN-01</span><span>SCALE 1:80 · A4</span></div>
-            <PlanDrawing chord={cv.chordMm} R={cv.R} sag={cv.sag} cabCountW={r.cabCountW} curveType={cv.curveType}/>
-            <div className="cap bot"><span>R = {num(cv.R/1000,2)} m · Sag = {num(cv.sag,0)} mm</span><span>Plan view</span></div>
+    <div className={preview?"vr-house":"vr-print vr-house"}>
+      <style dangerouslySetInnerHTML={{__html:themeHouseCSS(null)}}/>
+      <div className="page">
+      <header>
+          <div className="brand">
+            <div>
+              <div className="nm">Visual Rhyme <span>Pixel Quote Max</span></div>
+              <div className="sub">Powered by Microtronix Solutions · GSTIN 24AAWFM3775A1Z4</div>
+            </div>
           </div>
-          <div className="atlas-draw" style={{maxWidth:300}}>
-            <div className="cap top"><span>DRAWING · SECT-01</span><span>SCALE 1:40</span></div>
-            <SectionDrawing sag={cv.sag} curveType={cv.curveType}/>
-            <div className="cap bot"><span>{cv.curveType==="outer"?"Outer / Convex":"Inner / Concave"}</span><span>Section</span></div>
+          <div className="meta">
+            <div className="dt">{meta.ref}</div>
+            {meta.date}<br/>
+            <b>{meta.client||"Untitled Client"}</b><br/>
+            {meta.project||"Untitled project"}
+          </div>
+        </header>
+
+        <h1>{meta.project||`${r.product.series} · P${r.pitch}`} <span>{isCurved?"Curved Quotation.":"Quotation."}</span></h1>
+        <div className="subtitle">A {r.product.series} P{r.pitch} {r.product.type} wall, {num(r.builtWft,1)} × {num(r.builtHft,1)} feet, delivered, installed and commissioned{meta.client?` for ${meta.client}`:""}.</div>
+
+        <div className="tiles">
+          <div className="tile"><div className="k">Built size</div><div className="v">{num(r.builtWft,2)} × {num(r.builtHft,2)} ft</div></div>
+          <div className="tile"><div className="k">Resolution</div><div className="v">{num(r.pxW)} × {num(r.pxH)}</div></div>
+          <div className="tile"><div className="k">Cabinets</div><div className="v">{r.cabCountW} × {r.cabCountH} = {r.totalCabs}</div></div>
+          <div className="tile"><div className="k">Active area</div><div className="v">{num(r.areaSqft,1)} sqft</div></div>
+          <div className="tile"><div className="k">Peak draw</div><div className="v">{num(r.peakPowerW/1000,1)} kW</div></div>
+        </div>
+
+        <h2>1 · Screen &amp; panel</h2>
+        <table>
+          <tbody>
+            <tr>
+              <td className="k">Requested</td><td>{num(r.reqWmm/304.8,2)} × {num(r.reqHmm/304.8,2)} ft</td>
+              <td className="k">Pixel resolution</td><td>{num(r.pxW)} × {num(r.pxH)}</td>
+            </tr>
+            <tr>
+              <td className="k">Built (snapped)</td><td>{num(r.builtWft,2)} × {num(r.builtHft,2)} ft</td>
+              <td className="k">Total pixels</td><td>{num(r.totalPixels)}</td>
+            </tr>
+            <tr>
+              <td className="k">Millimetres</td><td>{num(r.builtWmm)} × {num(r.builtHmm)} mm</td>
+              <td className="k">Pixel density</td><td>{num(r.pixelDensitySqm)} / sqm</td>
+            </tr>
+            <tr>
+              <td className="k">Cabinet</td><td>{r.cab.label}{r.cabW!==r.cab.w?" ↺":""} × {r.totalCabs}</td>
+              <td className="k">Diagonal · aspect</td><td>{num(r.diagInches,1)}″ · {r.aspectRatio}</td>
+            </tr>
+            <tr>
+              <td className="k">Module</td><td>{r.modW} × {r.modH} mm × {num(r.totalMods)}</td>
+              <td className="k">Brightness · IP</td><td>{num(r.tech.brightnessNits)} nits · {r.tech.ipRating||"—"}</td>
+            </tr>
+            <tr>
+              <td className="k">Refresh · Bit</td><td>{num(r.tech.refreshHz)} Hz · {r.tech.bitDepth||"—"}-bit</td>
+              <td className="k">Min viewing dist.</td><td>{num(r.minViewingDistanceM,1)} m</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div className="mock">
+          <ElevationDrawing wmm={r.builtWmm} hmm={r.builtHmm} cabCountW={r.cabCountW} cabCountH={r.cabCountH} modPerCabW={r.modPerCabW} modPerCabH={r.modPerCabH}/>
+        </div>
+        <div className="mockcap">Front elevation · {r.cabCountW} × {r.cabCountH} = {r.totalCabs} cabinets · {num(r.totalMods)} modules · scale 1:80</div>
+
+        {isCurved && (<>
+          <div className="two" style={{marginTop:"2mm"}}>
+            <div>
+              <div className="mock">
+                <PlanDrawing chord={cv.chordMm} R={cv.R} sag={cv.sag} cabCountW={r.cabCountW} curveType={cv.curveType}/>
+              </div>
+              <div className="mockcap">Plan · R = {num(cv.R/1000,2)} m · Sag = {num(cv.sag,0)} mm</div>
+            </div>
+            <div>
+              <div className="mock">
+                <SectionDrawing sag={cv.sag} curveType={cv.curveType}/>
+              </div>
+              <div className="mockcap">Section · {cv.curveType==="outer"?"Outer / Convex":"Inner / Concave"}</div>
+            </div>
           </div>
         </>)}
 
         {threeDSnapshot && (<>
-          <div className="atlas-ch">
-            <div className="roman">{R()}</div>
-            <div className="name"><em>In situ.</em><small>Straight-on 3D reference · captured at export</small></div>
-            <div className="side">{S()}</div>
-            <div className="rule"/>
+          <div className="mock img-only">
+            <img src={threeDSnapshot} alt="3D reference"/>
           </div>
-          <div className="atlas-3d">
-            <div className="marks">3D REFERENCE · <span>STRAIGHT-ON</span> · 1200 × 720</div>
-            <img src={threeDSnapshot} alt="3D screen reference"/>
-            <div className="label">as it will stand.</div>
-          </div>
+          <div className="mockcap">In-situ 3D · straight-on reference · captured at export</div>
         </>)}
 
-        <div className="atlas-ch">
-          <div className="roman">{R()}</div>
-          <div className="name">Configuration &amp; <em>dimensions.</em><small>Built screen · pixel resolution · cabinet grid</small></div>
-          <div className="side">{S()}</div>
-          <div className="rule"/>
-        </div>
-        <div className="atlas-duo">
-          <div>
-            <div className="col-h">Built &amp; Panel</div>
-            <dl className="atlas-dl">
-              <dt>Requested</dt><dd>{num(r.reqWmm/304.8,2)} × {num(r.reqHmm/304.8,2)} ft</dd>
-              <dt>Built dimensions</dt><dd className="hi">{num(r.builtWft,2)} × {num(r.builtHft,2)} ft</dd>
-              <dt>Millimetres</dt><dd>{num(r.builtWmm)} × {num(r.builtHmm)} mm</dd>
-              <dt>Active area</dt><dd>{num(r.areaSqft,1)} sqft</dd>
-              <dt>Diagonal · aspect</dt><dd>{num(r.diagInches,1)}″ · {r.aspectRatio}</dd>
-              <dt>Cabinets (w × h)</dt><dd className="hi">{r.cabCountW} × {r.cabCountH} = {r.totalCabs}</dd>
-              <dt>Modules per cabinet</dt><dd>{r.modPerCabW} × {r.modPerCabH} = {r.modPerCab}</dd>
-              <dt>Total modules</dt><dd>{num(r.totalMods)}</dd>
-            </dl>
-          </div>
-          <div>
-            <div className="col-h">Pixel &amp; Light</div>
-            <dl className="atlas-dl">
-              <dt>Pixel resolution</dt><dd className="hi">{num(r.pxW)} × {num(r.pxH)}</dd>
-              <dt>Total pixels</dt><dd>{num(r.totalPixels)}</dd>
-              <dt>Pixel density</dt><dd>{num(r.pixelDensitySqm)} / sqm</dd>
-              <dt>Brightness</dt><dd>{num(r.tech.brightnessNits)} nits</dd>
-              <dt>Refresh · IP</dt><dd>{num(r.tech.refreshHz)} Hz · {r.tech.ipRating||"—"}</dd>
-              <dt>Bit depth</dt><dd>{r.tech.bitDepth?r.tech.bitDepth+"-bit":"—"}</dd>
-              <dt>Colour gamut</dt><dd>{num(r.tech.colorGamutSrgbPct)}% sRGB</dd>
-              <dt>Min viewing dist.</dt><dd>{num(r.minViewingDistanceM,1)} m</dd>
-              <dt>Controller ports</dt><dd>{r.ports}</dd>
-            </dl>
-          </div>
-        </div>
-
-        <div className="atlas-ch">
-          <div className="roman">{R()}</div>
-          <div className="name">Power &amp; <em>structure.</em><small>Peak draw · MCB · load per support · safety factor</small></div>
-          <div className="side">{S()}</div>
-          <div className="rule"/>
-        </div>
-        <div className="atlas-pillars">
-          <div className="atlas-pill hi"><div className="k">Peak draw</div><div className="v">{num(r.peakPowerW/1000,1)}<em> kW</em></div></div>
-          <div className="atlas-pill hi"><div className="k">MCB</div><div className="v" style={{fontSize:"14pt"}}>{r.mcbRating}</div></div>
-          <div className="atlas-pill warm"><div className="k">Load / point</div><div className="v">{num(r.loadPerSupportKg,0)}<em> kg</em></div></div>
-          <div className="atlas-pill warm"><div className="k">Safety factor</div><div className="v" style={{color:sfColor}}>{num(r.safetyFactor,1)}<em>×</em></div></div>
-        </div>
-        <div className="atlas-duo" style={{marginTop:14}}>
-          <div>
-            <div className="col-h">Power &amp; Electrical</div>
-            <dl className="atlas-dl">
-              <dt>Avg consumption</dt><dd>{num(r.avgPowerW)} W</dd>
-              <dt>Peak draw (×3, all-white)</dt><dd className="hi">{num(r.peakPowerW/1000,2)} kW</dd>
-              <dt>Peak current @ 220 V</dt><dd>{num(r.peakCurrentA,1)} A</dd>
-              <dt>MCB rating</dt><dd className="hi">{r.mcbRating}</dd>
-              <dt>Recommended supply</dt><dd className="hi">{num(r.recommendedSupplyKw)} kW</dd>
-              <dt>AC input</dt><dd>100–240 V · 50/60 Hz</dd>
-            </dl>
-          </div>
-          <div>
-            <div className="col-h">Weight &amp; Structure</div>
-            <dl className="atlas-dl">
-              <dt>Per cabinet</dt><dd>{num(r.perCabWeightKg,1)} kg</dd>
-              <dt>Screen weight</dt><dd>{num(r.screenWeightKg)} kg</dd>
-              <dt>Steel structure (est.)</dt><dd>{num(r.structuralSteelKg)} kg</dd>
-              <dt>Total system</dt><dd className="hi">{num(r.totalSystemKg)} kg</dd>
-              <dt>Vertical supports</dt><dd>{r.nVerticalSupports}</dd>
-              <dt>Tube spec</dt><dd>{r.tubeSpec}</dd>
-              <dt>Load per point</dt><dd className="hi">{num(r.loadPerSupportKg,1)} kg</dd>
-              <dt>Safety factor</dt><dd style={{color:sfColor,fontWeight:700}}>{num(r.safetyFactor,1)}× (rated {r.tubeWorkingLoadKg})</dd>
-            </dl>
-          </div>
-        </div>
+        <h2>2 · Power &amp; structure</h2>
+        <table>
+          <tbody>
+            <tr>
+              <td className="k">Peak power</td><td>{num(r.peakPowerW/1000,2)} kW</td>
+              <td className="k">Screen weight</td><td>{num(r.screenWeightKg)} kg</td>
+            </tr>
+            <tr>
+              <td className="k">Average power</td><td>{num(r.avgPowerW/1000,2)} kW</td>
+              <td className="k">Steel structure (est.)</td><td>{num(r.structuralSteelKg)} kg</td>
+            </tr>
+            <tr>
+              <td className="k">Peak current @ {r.acVoltage} V</td><td>{num(r.peakCurrentA,1)} A</td>
+              <td className="k">Total system</td><td>{num(r.totalSystemKg)} kg</td>
+            </tr>
+            <tr>
+              <td className="k">MCB recommendation</td><td><b>{r.mcbRating}</b></td>
+              <td className="k">Vertical supports</td><td>{r.nVerticalSupports}</td>
+            </tr>
+            <tr>
+              <td className="k">Recommended supply</td><td>{num(r.recommendedSupplyKw)} kW</td>
+              <td className="k">Load per point</td><td>{num(r.loadPerSupportKg,0)} kg</td>
+            </tr>
+            <tr>
+              <td className="k">AC input</td><td>100–240 V · 50/60 Hz</td>
+              <td className="k">Safety factor</td><td style={{color:sfColor,fontWeight:700}}>{num(r.safetyFactor,1)}× (rated {r.tubeWorkingLoadKg} kg)</td>
+            </tr>
+          </tbody>
+        </table>
 
         {isCurved && (<>
-          <div className="atlas-ch">
-            <div className="roman">{R()}</div>
-            <div className="name">Curve <em>geometry.</em><small>Radius · sagitta · per-joint gap · structural strategy</small></div>
-            <div className="side">{S()}</div>
-            <div className="rule"/>
-          </div>
-          <div className="atlas-duo">
-            <div>
-              <div className="col-h">Geometry</div>
-              <dl className="atlas-dl">
-                <dt>Radius (R)</dt><dd className="hi">{num(cv.R/1000,2)} m</dd>
-                <dt>{cv.curveType==="outer"?"Sagitta · cantilever":"Sagitta · depth"}</dt><dd>{num(cv.sag,0)} mm</dd>
-                <dt>Arc length</dt><dd>{num(cv.arcLen,0)} mm</dd>
-                <dt>Per-joint back gap</dt><dd style={{color:verdictColor(cv.verdict)}}>{num(cv.gapPerJoint,1)} mm</dd>
-                <dt>Per-cabinet wedge</dt><dd>{num(cv.cabAngleDeg,2)}°</dd>
-                <dt>Verdict</dt><dd style={{color:verdictColor(cv.verdict)}}>{cv.verdict}</dd>
-              </dl>
-            </div>
-            <div>
-              <div className="col-h">Structure &amp; Mounting</div>
-              <dl className="atlas-dl">
-                <dt>Mounting</dt><dd style={{fontSize:"8.5pt"}}>{cv.structuralStrategy}</dd>
-                <dt>Cantilever @ centre</dt><dd>{num(cv.cantileverAtCenter,0)} mm</dd>
-                <dt>Wall contact</dt><dd style={{fontSize:"8.5pt"}}>{cv.wallContactAtEnds}</dd>
-                <dt>Vertical posts</dt><dd>{cv.vertPosts}</dd>
-                <dt>Horizontal rails</dt><dd>{cv.horizRails}</dd>
-              </dl>
-            </div>
-          </div>
+          <h2>3 · Curve geometry</h2>
+          <table>
+            <tbody>
+              <tr>
+                <td className="k">Radius (R)</td><td><b>{num(cv.R/1000,2)} m</b></td>
+                <td className="k">Verdict</td><td style={{color:verdictColor(cv.verdict),fontWeight:700}}>{cv.verdict}</td>
+              </tr>
+              <tr>
+                <td className="k">{cv.curveType==="outer"?"Sagitta · cantilever":"Sagitta · depth"}</td><td>{num(cv.sag,0)} mm</td>
+                <td className="k">Per-joint back gap</td><td style={{color:verdictColor(cv.verdict)}}>{num(cv.gapPerJoint,1)} mm</td>
+              </tr>
+              <tr>
+                <td className="k">Arc length</td><td>{num(cv.arcLen,0)} mm</td>
+                <td className="k">Per-cabinet wedge</td><td>{num(cv.cabAngleDeg,2)}°</td>
+              </tr>
+              <tr>
+                <td className="k">Mounting</td><td colSpan={3} style={{fontSize:"8.4pt"}}>{cv.structuralStrategy}</td>
+              </tr>
+            </tbody>
+          </table>
         </>)}
 
-        <div className="atlas-ch">
-          <div className="roman">{R()}</div>
-          <div className="name">The <em>quotation.</em><small>All line items · GST as itemised · Grand Total inclusive</small></div>
-          <div className="side">{S()}</div>
-          <div className="rule"/>
-        </div>
-        <table className="atlas-qtable">
-          <thead><tr><th>Item</th><th>Rate</th><th>Qty</th><th style={{textAlign:"right"}}>Amount</th><th style={{textAlign:"right"}}>GST%</th><th style={{textAlign:"right"}}>GST</th></tr></thead>
+        <h2>{isCurved?"4":"3"} · Quotation</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th><th>Rate</th><th>Qty</th>
+              <th className="num">Amount (₹)</th><th className="num">GST%</th><th className="num">GST (₹)</th>
+            </tr>
+          </thead>
           <tbody>
             {r.lines.map((l,i)=>(
               <tr key={i}>
                 <td>{l.item}</td>
                 <td>{l.rateUnit==="%"?l.rate+"%":(l.item==="Video Controller"?"Per system":E.fmtINR(l.rate)+l.rateUnit)}</td>
                 <td>{l.qty}</td>
-                <td className="r">{E.fmtINR(l.amount)}</td>
-                <td className="r">{l.gstPct}%</td>
-                <td className="r">{E.fmtINR(l.gst)}</td>
+                <td className="num">{E.fmtINR(l.amount)}</td>
+                <td className="num">{l.gstPct}%</td>
+                <td className="num">{E.fmtINR(l.gst)}</td>
               </tr>
             ))}
+            <tr className="hl">
+              <td colSpan={3}>Subtotal · before GST</td>
+              <td className="num">{E.fmtINR(r.subtotal)}</td>
+              <td className="num">—</td>
+              <td className="num">{E.fmtINR(r.totalGst)}</td>
+            </tr>
           </tbody>
         </table>
-        <div className="atlas-subrow">
-          <div className="k">Subtotal · before GST</div>
-          <div className="v" style={{color:"#6B5E4A"}}>GST {E.fmtINR(r.totalGst)}</div>
-          <div className="v">{E.fmtINR(r.subtotal)}</div>
+
+        <div className="band">
+          <div className="l">Grand Total · Inclusive of GST</div>
+          <div className="r">{E.fmtINR(r.grandTotal)}</div>
+        </div>
+        <div className="note" style={{margin:"1.2mm 0 2mm"}}>
+          <b>{numToWords(r.grandTotal)} rupees</b> — delivered, installed and commissioned.
         </div>
 
-        <div className="atlas-total">
-          <div className="caption">Grand Total · inclusive of GST</div>
-          <div className="fig">
-            <div className="num"><span className="rs">₹</span>{E.fmtINR(r.grandTotal).replace("₹","")}</div>
-            <div className="words">{numToWords(r.grandTotal)} rupees — delivered, installed and commissioned.</div>
+        <div className="two">
+          <div>
+            <div className="note">
+              <b>Terms.</b> Validity 7 working days · Payment 60/30/10 (60% advance PO, 30% before dispatch, 10% on install completion) · Warranty <b>{warranty} {warranty===1?"year":"years"}</b> covering manufacturing defects only. This is a quotation, not an invoice.
+            </div>
           </div>
-          <div className="strap">
-            <span>Validity · <b>7 days</b></span>
-            <span>Payment · <b>60 / 30 / 10</b></span>
-            <span>Warranty · <b>{(r.tech && r.tech.warrantyYears) || 2} years</b></span>
+          <div>
+            <div className="ok">
+              <b>Included.</b> Delivery, installation, commissioning, {r.ports}-port video controller, {r.tech.ipRating||"IP54"} panels, {warranty}-yr manufacturer warranty.
+            </div>
           </div>
         </div>
 
-        <div className="atlas-notes">
-          <b>Notes.</b> ACP, scaffolding and H-frame priced as actual. Quote valid seven working days from date of issue. All prices inclusive of GST as itemised. Transportation, fabrication and electrical work charged additional unless specified.
-          {isCurved && <span className="fine">Curved-screen structural, steel and power figures are pre-engineering estimates. Final structural design, anchor specification and wind-load verification must be stamped by a licensed structural engineer per local code (IS 875 Part 3 for wind in India).</span>}
-          <span className="fine">Payment: 60% advance against PO · 30% before dispatch · 10% on install completion. Warranty covers manufacturing defects only. This is a quotation, not an invoice.</span>
-        </div>
+        {isCurved && (
+          <div className="warn">
+            <b>Curved-screen note.</b> Structural, steel and power figures are pre-engineering estimates. Final structural design, anchor specification and wind-load verification must be stamped by a licensed structural engineer per local code (IS 875 Part 3 for wind in India).
+          </div>
+        )}
 
-        <div className="atlas-foot">
-          <div>{meta.ref} · Page 1 of 1</div>
-          <div className="brand">Visual Rhyme<small>Powered by Microtronix Solutions · GSTIN 24AAWFM3775A1Z4</small></div>
-          <div>Ahmedabad · 382481</div>
-        </div>
+        <footer>
+          <span>Visual Rhyme · Ahmedabad · Powered by Microtronix Solutions · GSTIN 24AAWFM3775A1Z4</span>
+          <span className="pw">{meta.ref}</span>
+        </footer>
       </div>
     </div>
   );
