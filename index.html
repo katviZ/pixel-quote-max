@@ -607,7 +607,8 @@ function PriceTable({r,paper}){
   const td={padding:"7px 8px",fontSize:12,borderBottom:`1px solid ${bd}`,color:ink};
   const tr={...td,textAlign:"right",fontFamily:MO,fontWeight:600};
   return (
-    <table style={{width:"100%",borderCollapse:"collapse"}}>
+    <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch",margin:"0 -4px"}}>
+    <table style={{width:"100%",minWidth:520,borderCollapse:"collapse"}}>
       <thead><tr><th style={th}>Item</th><th style={th}>Rate</th><th style={th}>Qty</th><th style={{...th,textAlign:"right"}}>Amount</th><th style={{...th,textAlign:"right"}}>GST%</th><th style={{...th,textAlign:"right"}}>GST</th></tr></thead>
       <tbody>{r.lines.map((l,i)=>(
         <tr key={i}><td style={td}>{l.item}</td><td style={td}>{l.rateUnit==="%"?l.rate+"%":(l.item==="Video Controller"?"Per system":E.fmtINR(l.rate)+l.rateUnit)}</td><td style={td}>{l.qty}</td><td style={tr}>{E.fmtINR(l.amount)}</td><td style={tr}>{l.gstPct}%</td><td style={tr}>{E.fmtINR(l.gst)}</td></tr>
@@ -617,6 +618,7 @@ function PriceTable({r,paper}){
         <tr><td colSpan="3" style={{...td,fontWeight:800,fontSize:14,color:paper?C.magenta:C.lavender,border:"none"}}>Grand Total (incl. GST)</td><td colSpan="3" style={{...tr,fontWeight:800,fontSize:16,color:paper?C.magenta:C.lavender,border:"none"}}>{E.fmtINR(r.grandTotal)}</td></tr>
       </tfoot>
     </table>
+    </div>
   );
 }
 
@@ -839,110 +841,6 @@ function themeHouseCSS(dealer){
   return HOUSE_CSS.replace(/:root\{[^}]*\}/,
     `:root{ --p:${s.base}; --v:${s.deep}; --deep:${s.darkest}; --ink:#1c1622; --grey:#5a5566; --line:${s.line}; --bg:${s.bg}; --soft:${s.soft}; --green:#0d9152; --greenbg:#e8f6ee; --amber:#b8791a; --amberbg:#fbf1df; }`);
 }
-
-/* html2pdf.js integration — direct-download PDF generator.
- * Loaded lazily on first call so it doesn't slow the initial load.
- * Renders the same HTML we'd otherwise open in a popup, wraps it as a
- * PDF blob, and triggers a browser download with a friendly filename.
- * Works on desktop AND mobile (including iOS PWA in standalone mode
- * where popups are broken). Falls back to popup on failure. */
-let _html2pdfPromise = null;
-function loadHtml2Pdf() {
-  if (_html2pdfPromise) return _html2pdfPromise;
-  _html2pdfPromise = new Promise((resolve, reject) => {
-    if (window.html2pdf) return resolve(window.html2pdf);
-    const s = document.createElement("script");
-    s.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
-    s.crossOrigin = "anonymous";
-    s.onload = () => resolve(window.html2pdf);
-    s.onerror = () => { _html2pdfPromise = null; reject(new Error("html2pdf load failed")); };
-    document.head.appendChild(s);
-  });
-  return _html2pdfPromise;
-}
-
-/* Render a full-document HTML string to PDF and trigger download.
- * `html` is a complete <!DOCTYPE html>... document; we parse it and
- * transplant the <style> tags + <body> into an off-screen container
- * so html2canvas can see it with the right CSS applied.
- * Returns true on success, false if html2pdf failed (caller should fall
- * back to popup). */
-async function downloadHtmlAsPdf(html, filename) {
-  try {
-    await loadHtml2Pdf();
-    if (!window.html2pdf) return false;
-
-    // Filename: derive from doc <title> if not passed in.
-    const parsed = new DOMParser().parseFromString(html, "text/html");
-    if (!filename) {
-      const t = parsed.querySelector("title");
-      filename = (t && t.textContent.trim().replace(/[\/:*?"<>|]+/g, "_").slice(0, 120)) || "document";
-      if (!/\.pdf$/i.test(filename)) filename += ".pdf";
-    }
-
-    // Strip the auto-print <script> — that script is meant to fire in a
-    // dedicated print popup; here it would trigger the main window's
-    // Print dialog during capture and interrupt html2canvas.
-    const cleanHtml = html.replace(/<script[^>]*>[\s\S]*?window\.print[\s\S]*?<\/script>/gi, "");
-    const cleaned   = new DOMParser().parseFromString(cleanHtml, "text/html");
-
-    // Build an in-viewport render container. html2canvas doesn't render
-    // elements positioned at left:-99999px reliably (its measured
-    // bounding box comes back 0×0 in some browsers). Place top-left with
-    // opacity:0 and z-index:-9999 — invisible to the user but with real,
-    // measurable layout for the canvas.
-    const container = document.createElement("div");
-    container.setAttribute("data-pqm-pdf", "1");
-    container.style.cssText = [
-      "position:fixed", "top:0", "left:0", "width:210mm",
-      "background:#ffffff", "opacity:0", "pointer-events:none",
-      "z-index:-9999", "overflow:hidden"
-    ].join(";");
-
-    // Transplant <style> AND <link rel="stylesheet"> tags — without the
-    // <link> tags Google Fonts (Fraunces/Manrope/JetBrains Mono) never
-    // load in the container and the layout collapses to fallback fonts,
-    // which is why the first version produced blank/empty pages.
-    cleaned.head.querySelectorAll('style, link[rel="stylesheet"], link[rel="preconnect"]').forEach(el => {
-      container.appendChild(el.cloneNode(true));
-    });
-    Array.from(cleaned.body.childNodes).forEach(node => {
-      container.appendChild(node.cloneNode(true));
-    });
-    document.body.appendChild(container);
-
-    try {
-      // Wait for webfonts + one animation frame so layout settles before
-      // html2canvas snapshots.
-      try { await document.fonts.ready; } catch (_) {}
-      await new Promise(r => requestAnimationFrame(() => setTimeout(r, 400)));
-
-      await window.html2pdf().set({
-        margin: 0,
-        filename: filename,
-        image: { type: "jpeg", quality: 0.96 },
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          letterRendering: true,
-          backgroundColor: "#ffffff",
-          logging: false,
-          windowWidth: container.scrollWidth || 794,
-          windowHeight: container.scrollHeight || 1123
-        },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait", compress: true },
-        pagebreak: { mode: ["css", "legacy"] }
-      }).from(container).save();
-      return true;
-    } finally {
-      document.body.removeChild(container);
-    }
-  } catch (e) {
-    console.warn("html2pdf failed, falling back to popup:", e);
-    return false;
-  }
-}
-
 
 function PrintSheet({r,meta,preview,threeDSnapshot}){
   if(!r) return null;
@@ -1826,11 +1724,12 @@ body{background:#180d24;color:#1A1208;font-family:'Manrope',sans-serif;-webkit-f
 </div>
 <script>window.addEventListener("load",function(){setTimeout(function(){window.print();},350);});<\/script>
 </body></html>`;
-    // Preferred path: generate real PDF and trigger download (desktop + mobile).
-    const ok = await downloadHtmlAsPdf(html);
-    if (ok) return;
-
-    // Fallback: mobile blob or desktop popup.
+    // Mobile branch: iPhone/Android browsers (especially iOS Safari when
+    // opened from the home-screen icon in "standalone" display-mode)
+    // refuse window.open("","_blank") + document.write — the popup opens
+    // blank and the PWA appears to close. Stream the HTML through a Blob
+    // URL that the mobile browser can navigate to directly; the auto-print
+    // script inside the HTML still fires on load.
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent||"");
     if (isMobile) {
       try {
