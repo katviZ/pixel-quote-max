@@ -871,24 +871,65 @@ async function downloadHtmlAsPdf(html, filename) {
   try {
     await loadHtml2Pdf();
     if (!window.html2pdf) return false;
-    // Parse doc, transplant styles + body into an off-screen node
+
+    // Filename: derive from doc <title> if not passed in.
     const parsed = new DOMParser().parseFromString(html, "text/html");
     if (!filename) {
       const t = parsed.querySelector("title");
       filename = (t && t.textContent.trim().replace(/[\/:*?"<>|]+/g, "_").slice(0, 120)) || "document";
       if (!/\.pdf$/i.test(filename)) filename += ".pdf";
     }
+
+    // Strip the auto-print <script> — that script is meant to fire in a
+    // dedicated print popup; here it would trigger the main window's
+    // Print dialog during capture and interrupt html2canvas.
+    const cleanHtml = html.replace(/<script[^>]*>[\s\S]*?window\.print[\s\S]*?<\/script>/gi, "");
+    const cleaned   = new DOMParser().parseFromString(cleanHtml, "text/html");
+
+    // Build an in-viewport render container. html2canvas doesn't render
+    // elements positioned at left:-99999px reliably (its measured
+    // bounding box comes back 0×0 in some browsers). Place top-left with
+    // opacity:0 and z-index:-9999 — invisible to the user but with real,
+    // measurable layout for the canvas.
     const container = document.createElement("div");
-    container.style.cssText = "position:fixed;left:-99999px;top:0;background:#fff;width:210mm;";
-    parsed.head.querySelectorAll("style").forEach(el => container.appendChild(el.cloneNode(true)));
-    Array.from(parsed.body.childNodes).forEach(node => container.appendChild(node.cloneNode(true)));
+    container.setAttribute("data-pqm-pdf", "1");
+    container.style.cssText = [
+      "position:fixed", "top:0", "left:0", "width:210mm",
+      "background:#ffffff", "opacity:0", "pointer-events:none",
+      "z-index:-9999", "overflow:hidden"
+    ].join(";");
+
+    // Transplant <style> AND <link rel="stylesheet"> tags — without the
+    // <link> tags Google Fonts (Fraunces/Manrope/JetBrains Mono) never
+    // load in the container and the layout collapses to fallback fonts,
+    // which is why the first version produced blank/empty pages.
+    cleaned.head.querySelectorAll('style, link[rel="stylesheet"], link[rel="preconnect"]').forEach(el => {
+      container.appendChild(el.cloneNode(true));
+    });
+    Array.from(cleaned.body.childNodes).forEach(node => {
+      container.appendChild(node.cloneNode(true));
+    });
     document.body.appendChild(container);
+
     try {
+      // Wait for webfonts + one animation frame so layout settles before
+      // html2canvas snapshots.
+      try { await document.fonts.ready; } catch (_) {}
+      await new Promise(r => requestAnimationFrame(() => setTimeout(r, 400)));
+
       await window.html2pdf().set({
         margin: 0,
         filename: filename,
         image: { type: "jpeg", quality: 0.96 },
-        html2canvas: { scale: 2, useCORS: true, letterRendering: true, backgroundColor: "#ffffff", logging: false },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          letterRendering: true,
+          backgroundColor: "#ffffff",
+          logging: false,
+          windowWidth: container.scrollWidth || 794,
+          windowHeight: container.scrollHeight || 1123
+        },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait", compress: true },
         pagebreak: { mode: ["css", "legacy"] }
       }).from(container).save();
