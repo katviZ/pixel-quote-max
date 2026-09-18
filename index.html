@@ -893,7 +893,7 @@ function PrintSheet({r,meta,preview,threeDSnapshot}){
             </tr>
             <tr>
               <td className="k">Millimetres</td><td>{num(r.builtWmm)} × {num(r.builtHmm)} mm</td>
-              <td className="k">Pixel density</td><td>{num(r.pixelDensitySqm)} / sqm</td>
+              <td className="k">Pixel density</td><td>{num(r.pixelDensitySqm/10.7639)} / sqft</td>
             </tr>
             <tr>
               <td className="k">Cabinet</td><td>{r.cab.label}{r.cabW!==r.cab.w?" ↺":""} × {r.totalCabs}</td>
@@ -2034,7 +2034,7 @@ body{background:#180d24;color:#1A1208;font-family:'Manrope',sans-serif;-webkit-f
               <Metric label="Built screen" value={`${num(result.builtWft,2)} × ${num(result.builtHft,2)}`} unit="ft" accent={C.amber} sub={`${num(result.builtWmm)} × ${num(result.builtHmm)} mm · snapped to whole cabinets`}/>
               <Metric label="Cabinets (W × H)" value={`${result.cabCountW} × ${result.cabCountH}`} sub={`${result.totalCabs} cabinets · ${num(result.totalMods)} modules`}/>
               <Metric label="Pixel resolution" value={`${num(result.pxW)} × ${num(result.pxH)}`} sub={`${num(result.totalPixels)} px · pitch ${result.pitch}mm`}/>
-              <Metric label="Diagonal · Aspect" value={`${num(result.diagInches,1)}″ · ${result.aspectRatio}`} sub={`${num(result.pixelDensitySqm)} px/sqm · min view ${num(result.minViewingDistanceM,1)} m`}/>
+              <Metric label="Diagonal · Aspect" value={`${num(result.diagInches,1)}″ · ${result.aspectRatio}`} sub={`${num(result.pixelDensitySqm/10.7639)} px/sqft · min view ${num(result.minViewingDistanceM,1)} m`}/>
               <Metric label="Active area" value={num(result.areaSqft,1)} unit="sqft" sub={`${result.ports} controller port(s)`}/>
               <Metric label="Brightness · Refresh" value={`${num(result.tech.brightnessNits)} nits · ${num(result.tech.refreshHz)} Hz`} sub={`${result.tech.displayTech||""} · ${result.tech.ipRating||""}`}/>
               <Metric label="Power · MCB" value={`${result.mcbRating} · ${num(result.peakCurrentA,1)}A`} accent={C.amber} sub={`peak ${num(result.peakPowerW/1000,2)} kW · avg ${num(result.avgPowerW/1000,2)} kW · supply ${num(result.recommendedSupplyKw)} kW`}/>
