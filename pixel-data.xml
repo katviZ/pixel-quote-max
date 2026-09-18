@@ -48,7 +48,7 @@
   <products>
 
     <product id="outdoor" series="Reyansh Outdoor" type="MiniLED" env="outdoor" moduleW="320" moduleH="160"
-             displayTech="SMD MiniLED" ledType="TrueHue SMD1921 (Nationstar/Kinglight)"
+             displayTech="SMD MiniLED" ledType="TrueHue MiniLED · SMD1921 · GKGD"
              brightnessNits="5500" refreshHz="3840" bitDepth="14"
              viewingAngleDeg="155" contrastStatic="6000" contrastDynamic="200000"
              colorGamutSrgbPct="110" colorGamutRec2020Pct="85"
@@ -67,7 +67,7 @@
     </product>
 
     <product id="indoor" series="Reyansh Indoor" type="MiniLED" env="indoor" moduleW="320" moduleH="160"
-             displayTech="SMD MiniLED" ledType="Kinglight TrueHue MiniLED"
+             displayTech="SMD MiniLED" ledType="TrueHue MiniLED · SMD1921 · GKGD"
              brightnessNits="700" refreshHz="7680" bitDepth="14"
              viewingAngleDeg="160" contrastStatic="6000" contrastDynamic="200000"
              colorGamutSrgbPct="120" colorGamutRec2020Pct="93"
